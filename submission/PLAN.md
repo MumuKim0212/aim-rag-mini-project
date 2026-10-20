@@ -171,8 +171,13 @@ thinking 토큰은 출력으로 과금된다. 답변·채점 모두 `thinking_le
 | 답변, 전부 `gemini-3.1-flash-lite`일 때 | 같음 | 약 2.7 |
 | 채점, `gemini-3.6-flash` (thinking 약 400 토큰/회 포함) | 입력 2.0M, 출력 0.7M | 약 4.1 |
 | 인덱스 구축, 청킹·임베딩 변형 6번 | 약 3M | 1 미만 |
+| **일회성** 페이지 추출 VLM 보충 (실측, 2026-10-20) | 입력 0.75M, 출력 0.10M | **0.92** |
 
-프로젝트 전체 예상은 약 10 USD 안팎이다(답변 대부분이 기준 `gemini-3.5-flash-lite`, 일부가 007의 `gemini-3.8-flash`). 답변을 전부 `gemini-3.8-flash`로 해도 약 13 USD다. 실제 비용은 실행 기록의 토큰으로 계산해 PROCESS.md 장부에 함께 적는다. 2027-01-01 이후에 실행하면 flash 등급 단가가 2배가 되므로 확인일을 다시 갱신한다.
+비용은 두 종류로 나눠 보고한다.
+- **일회성 비용**: 모든 실험이 공유하는 준비 단계. 페이지 추출 VLM 보충(실측 0.92 USD, `corpus/extraction.json`)과 인덱스 구축(설정마다 `out/index/<key>/build.json`, `summary.json`의 `index_build_usd`). 실험별 문항당 비용에는 넣지 않는다.
+- **실행 비용**: 문항마다 드는 답변·검색 비용(`summary.json`의 `cost.usd`, `usd_per_question`)과 채점 비용(`judge_usd`). 설정 비교는 이 값으로 한다.
+
+프로젝트 전체 예상은 약 10 USD 안팎이다(일회성 비용 포함)(답변 대부분이 기준 `gemini-3.5-flash-lite`, 일부가 007의 `gemini-3.8-flash`). 답변을 전부 `gemini-3.8-flash`로 해도 약 13 USD다. 실제 비용은 실행 기록의 토큰으로 계산해 PROCESS.md 장부에 함께 적는다. 2027-01-01 이후에 실행하면 flash 등급 단가가 2배가 되므로 확인일을 다시 갱신한다.
 
 ## 5. 평가 지표와 측정 방법
 
