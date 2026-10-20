@@ -1,0 +1,68 @@
+# Baseline configuration (submission/PLAN.md §3.1). Every experiment starts from this file.
+# A variant is a separate file that names this one with `base:` and lists ONLY the keys it changes;
+# see configs/README.md. Do not edit values here after the baseline run — that changes every comparison.
+
+name: 000_baseline
+card: null
+description: Recursive 800/100, vector k=5, gemini-3.8-flash, shared answer prompt
+
+system: rag                     # rag | agent
+
+corpus:
+  pdf_dir: 01_data
+  pages: corpus/pages.jsonl     # committed page extraction; everyone chunks the same text
+  exclude_pages:                # file -> [first, last] pages (1-based) not indexed
+    financial_glossary_readable.pdf: [20, 25]   # URL source list, not content
+  scopes:                       # file patterns, relative to pdf_dir
+    A: [financial_glossary_readable.pdf, "standard_terms/*.pdf"]
+    B: ["*.pdf", "*/*.pdf"]
+  set_scope:                    # golden `set` -> index scope
+    base_positive: A
+    base_negative: A
+    life_guide: B
+    additional: B
+    self: B
+
+chunking:
+  method: recursive             # recursive | structure
+  chunk_size: 800               # characters
+  chunk_overlap: 100
+  add_header: false             # prefix each chunk with document title / section heading
+
+embedding:
+  model: gemini-embedding-2
+  dimensions: 3072
+  task_type: null               # gemini-embedding-001 only (gemini-embedding-2 does not accept it)
+
+retrieval:
+  method: vector                # vector | bm25 | hybrid
+  k: 5
+  mmr: false
+  mmr_lambda: 0.5
+  hybrid_alpha: 0.5             # weight of the vector score in hybrid fusion
+  bm25_tokenizer: kiwi
+
+answer:
+  model: gemini-3.8-flash
+  prompt: prompts/answer_v1.md
+  temperature: 0                # ignored by gemini-3.6-flash and gemini-3.5-flash-lite (fixed sampling)
+  thinking_level: low           # low | high; verified 2026-10-20 on all four candidates (submission/PROCESS.md §0)
+
+agent:                          # used when system: agent
+  max_research: 2
+  max_cite_retry: 1
+  node_models:                  # null = answer.model
+    classify: null
+    grade: null
+    rewrite: null
+
+judge:
+  model: gemini-3.6-flash       # fixed for the whole project; never one of the answer candidates
+  prompt: prompts/judge_v1.md
+  temperature: 0                # ignored by gemini-3.6-flash: judge noise must be measured (workflow step 3b)
+  thinking_level: low           # 3.6-flash still thinks at low (~390 tokens/call), billed as output
+
+run:
+  concurrency: 4
+  timeout_s: 120
+  max_retries: 2

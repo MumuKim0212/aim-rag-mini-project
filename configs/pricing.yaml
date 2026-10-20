@@ -1,0 +1,17 @@
+# Single source of model prices for cost calculation (src/rag/cost.py). USD per 1M tokens, paid tier, Standard.
+# Output prices include thinking tokens. Checked 2026-10-20:
+#   https://ai.google.dev/gemini-api/docs/pricing
+# When a price changes, do not edit old entries in place: add `valid_from` / `valid_until` and a new entry,
+# so earlier runs keep the cost they had when they ran.
+
+currency: USD
+unit: per_1m_tokens
+checked: 2026-10-20
+
+models:
+  gemini-3.1-flash-lite: {input: 0.25, output: 1.50}
+  gemini-3.5-flash-lite: {input: 0.30, output: 2.50}
+  gemini-3.6-flash:      {input: 0.75, output: 3.75, valid_until: 2026-12-31}   # 1.50 / 7.50 from 2027-01-01
+  gemini-3.8-flash:      {input: 0.75, output: 3.75, valid_until: 2026-12-31}   # 1.50 / 7.50 from 2027-01-01
+  gemini-embedding-2:    {input: 0.20}
+  gemini-embedding-001:  {input: 0.15}   # not on the official page; third-party listing — confirm before card 006

@@ -218,3 +218,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- rag_mini_project ---
+# secrets (any .env variant)
+.env.*
+!.env.example
+# generated: indexes, run logs, grades, caches
+out/
+# scratch analysis (one-off, not part of the pipeline)
+scratch/
+
+# Claude Code personal settings (shared settings live in .claude/settings.json)
+.claude/settings.local.json

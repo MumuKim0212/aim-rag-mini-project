@@ -1,0 +1,6 @@
+{
+  "env": {
+    "LANGSMITH_TRACING": "false",
+    "LANGCHAIN_TRACING_V2": "false"
+  }
+}
