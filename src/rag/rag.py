@@ -6,15 +6,14 @@ systems differ only in the graph around it (PLAN §3.3). Change them only with a
 new experiment; after the baseline run, any behavior change here invalidates the baseline.
 """
 
-import re
 import threading
 import time
-from functools import lru_cache
 from typing import Literal
 
 from pydantic import BaseModel
 
-from . import ROOT, llm
+from . import llm
+from .prompts import fill, load_prompt
 from .retrieval import load_retriever
 
 
@@ -24,16 +23,6 @@ class AnswerOut(BaseModel):
     citations: list[int]
 
 
-@lru_cache(maxsize=None)
-def load_prompt(path: str) -> dict:
-    """Prompt file: a GUIDE comment, then `## system` and `## user` sections."""
-    text = re.sub(r"<!--.*?-->", "", (ROOT / path).read_text(encoding="utf-8"), flags=re.S)
-    sections = dict(re.findall(r"^## (\w+)\s*\n(.*?)(?=^## |\Z)", text, flags=re.S | re.M))
-    if not {"system", "user"} <= sections.keys():
-        raise ValueError(f"{path}: needs '## system' and '## user' sections")
-    return {k: v.strip() for k, v in sections.items()}
-
-
 def render_context(units: list[dict]) -> str:
     return "\n\n".join(f"[{i}] ({u['source']}, p.{u['page']})\n{u['content']}" for i, u in enumerate(units, 1))
 
@@ -41,7 +30,7 @@ def render_context(units: list[dict]) -> str:
 def generate_answer(question: str, units: list[dict], cfg: dict, steps: dict, node: str = "generate") -> AnswerOut:
     a = cfg["answer"]
     prompt = load_prompt(a["prompt"])
-    user = prompt["user"].replace("{question}", question).replace("{context}", render_context(units) or "(없음)")
+    user = fill(prompt["user"], question=question, context=render_context(units) or "(없음)")
     return llm.generate_json(model=a["model"], system=prompt["system"], user=user, schema=AnswerOut,
                              temperature=a.get("temperature"), thinking_level=a.get("thinking_level"),
                              steps=steps, node=node, retries=cfg["run"]["max_retries"],

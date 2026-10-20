@@ -10,7 +10,8 @@ Implemented here (shared infrastructure, do not fork per experiment):
 - harness  : batch run / grade / evaluate / report used by scripts/
 
 Baseline pipeline (implemented, tested; frozen once the baseline has run):
-- ingest     : PDF -> pages (PyMuPDF text layer)
+- ingest     : PDF -> pages (PyMuPDF text layer + VLM supplement for scope-B pages, configs/extraction.yaml)
+- prompts    : prompt-file loading shared by rag and ingest
 - chunking   : "recursive"
 - retrieval  : index build, "vector" search (Chroma, gemini-embedding-2 with its text prefixes)
 - rag        : BaselineRAG and the shared answer step (generate_answer, map_citations, format_answer)

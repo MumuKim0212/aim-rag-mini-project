@@ -12,6 +12,7 @@ Verified 2026-10-20 (google-genai 2.23.0, Gemini 3.x; scratch/check_*.py):
 - embed_content reports no token usage: index building counts tokens with count_tokens; query embeddings
   are estimated from the index's tokens-per-character ratio and recorded with estimated=True.
 - response_schema (pydantic) works with thinking_level; response.parsed holds the object.
+- describe_image: page image + text for extraction (src/rag/ingest.py supplement_visuals).
 - gemini-embedding-2 (multimodal) merges a list[str] into ONE vector; a list of Content objects gives one
   vector per text, identical to single calls (cosine 1.0). gemini-embedding-001 handles both forms.
 """
@@ -119,3 +120,26 @@ def embed(texts: list[str], *, embedding_cfg: dict, purpose: str, steps: dict, n
     if len(vectors) != len(texts):
         raise ValueError(f"{embedding_cfg['model']}: {len(vectors)} vectors for {len(texts)} texts")
     return vectors
+
+
+def describe_image(*, model: str, system: str, user: str, png: bytes, thinking_level: str | None, steps: dict,
+                   node: str, retries: int = 2, timeout_s: float | None = None) -> tuple[str, str | None]:
+    """One image + text call (page extraction). Returns (text, finish_reason); text is "" when blocked
+    (e.g. finish_reason RECITATION: Gemini refuses verbatim copies of published text)."""
+    config = types.GenerateContentConfig(
+        system_instruction=system,
+        thinking_config=types.ThinkingConfig(thinking_level=thinking_level) if thinking_level else None)
+    contents = [types.Content(role="user", parts=[types.Part.from_bytes(data=png, mime_type="image/png"),
+                                                  types.Part(text=user)])]
+    start = time.perf_counter()
+    response = with_retry(lambda: client(timeout_s).models.generate_content(model=model, contents=contents,
+                                                                            config=config), retries)
+    finish = response.candidates[0].finish_reason if response.candidates else None
+    finish = getattr(finish, "name", finish)
+    record_call(steps, node=node, model=model, seconds=time.perf_counter() - start, finish_reason=finish,
+                **usage_from_genai(response))
+    try:
+        text = response.text or ""
+    except ValueError:  # no text part (blocked)
+        text = ""
+    return text.strip(), finish

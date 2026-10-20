@@ -1,0 +1,22 @@
+# Page extraction (scripts/extract_pages.py). Runs once; its output corpus/pages.jsonl is committed and frozen,
+# and every index and golden evidence quote is built on it. A summary of the run goes to corpus/extraction.json.
+#
+# Text layer: PyMuPDF, every page of every PDF.
+# Visual supplement: the page image goes to a VLM, which writes only what the text layer lacks (tables as
+# markdown with units and footnotes, chart values, text inside images). The result is APPENDED after the
+# text layer, so quotes taken from the text layer still match after the supplement.
+
+visual:
+  enabled: true
+  paths:                        # relative to corpus.pdf_dir. Scope A (glossary, standard terms) has no images: skipped
+    - financial_life_guide.pdf
+    - "additional/*.pdf"
+  model: gemini-3.8-flash
+  prompt: prompts/vlm_page_v1.md
+  thinking_level: low
+  dpi: 150
+  concurrency: 6
+  timeout_s: 180
+  max_retries: 3
+  cache_dir: out/vlm_cache      # one file per page call; a rerun resumes and costs nothing for finished pages
+  separator: "[표·그림 정리]"     # line between the text layer and the VLM supplement in page["text"]
