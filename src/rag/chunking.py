@@ -2,15 +2,20 @@
 a new registered function plus a config variant, not a new script.
 
 Chunk unit (also the evalkit unit):
-    {"chunk_id": "<file-hash>-p<page>-<n>", "source": "<file>", "page": <first page>, "content": "...",
+    {"chunk_id": "<doc>-p<page>-<n>", "source": "<file>", "page": <first page>, "content": "...",
      "pages": [<pages covered>]}
 
 `page` is the page the chunk starts on; a chunk crossing pages lists all of them in `pages`.
+The baseline splits each page on its own, so its chunks never cross pages.
 """
 
+import hashlib
 from typing import Callable
 
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 CHUNKERS: dict[str, Callable[[list[dict], dict], list[dict]]] = {}
+SEPARATORS = ["\n\n", "\n", ". ", " ", ""]
 
 
 def register(name: str):
@@ -20,17 +25,37 @@ def register(name: str):
     return wrap
 
 
+def doc_id(file: str) -> str:
+    return hashlib.sha1(file.encode("utf-8")).hexdigest()[:8]
+
+
 def chunk_pages(pages: list[dict], cfg: dict) -> list[dict]:
     method = cfg["chunking"]["method"]
     if method not in CHUNKERS:
         raise KeyError(f"unknown chunking.method {method!r}; registered: {sorted(CHUNKERS)}")
-    return CHUNKERS[method](pages, cfg)
+    if cfg["chunking"].get("add_header"):
+        raise NotImplementedError("chunking.add_header — card 003")
+    chunks = CHUNKERS[method](pages, cfg)
+    ids = [c["chunk_id"] for c in chunks]
+    if len(ids) != len(set(ids)):
+        raise ValueError("duplicate chunk_id")
+    return chunks
 
 
 @register("recursive")
 def recursive(pages: list[dict], cfg: dict) -> list[dict]:
-    """RecursiveCharacterTextSplitter with chunking.chunk_size / chunk_overlap (baseline)."""
-    raise NotImplementedError("baseline chunking — PLAN §3.1")
+    """RecursiveCharacterTextSplitter per page with chunking.chunk_size / chunk_overlap (characters)."""
+    c = cfg["chunking"]
+    splitter = RecursiveCharacterTextSplitter(chunk_size=c["chunk_size"], chunk_overlap=c["chunk_overlap"],
+                                              separators=SEPARATORS, keep_separator="end")
+    chunks = []
+    for page in pages:
+        for n, text in enumerate(t.strip() for t in splitter.split_text(page["text"])):
+            if text:
+                chunks.append({"chunk_id": f"{doc_id(page['file'])}-p{page['page']:03d}-{n:02d}",
+                               "source": page["file"], "page": page["page"], "content": text,
+                               "pages": [page["page"]]})
+    return chunks
 
 
 @register("structure")

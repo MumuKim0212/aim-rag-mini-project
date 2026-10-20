@@ -51,7 +51,7 @@ Apply to every step. The irreversible ones are repeated in `CLAUDE.md`.
 | 3 | (a) `run.py ... --name dev_000_baseline_r2`, grade, evaluate; (b) `grade.py --experiment dev_000_baseline --suffix __regrade1`; compare with `python -m evalkit.paired` |
 | 4–5 | `results/dev_000_baseline/metrics.jsonl` + `grades.jsonl`; `evalkit.metrics.proxy_check` |
 | 6 | variant config → `run.py --retrieval-only` → `evaluate.py` → `python scripts/compare.py dev_000_baseline <variant>_retrieval --metric <proxy>` → `python -m evalkit.headroom ...` → answer run only if gates pass |
-| 8 | the same commands with `--split test --final` |
+| 8 | for T1, T2, T3: `run.py --split test --final`, `grade.py --final`, `evaluate.py --with-runs --final`; then `compare.py` T1→T2, T2→T3; `report.py --include-test --final` |
 
 ## The eight steps
 
@@ -151,10 +151,25 @@ Exit criteria
 
 ### 8. Final test run and write-up
 
-Fix the configuration. Run test once for the baseline and the final system, compare with `evalkit/paired.py`, and write `submission/EVALUATION.md`.
+Project decision (2026-10-20): three systems, each run once on test (provided test split + self-written set), so the tuning effect and the structure effect are measured separately:
+
+| Run | Config | Shows |
+|---|---|---|
+| T1 | `configs/baseline.yaml` (000_baseline) | starting point |
+| T2 | last config of the adopted chain (improved RAG) | tuning effect = T2 − T1 |
+| T3 | agent on T2's retrieval, answer model, and prompt | structure effect = T3 − T2 |
+
+1. Before running, write the three config files in `submission/PROCESS.md` §9 and commit. Nothing changes after a test number is seen.
+2. T3 changes only the graph. If the agent's node models differ from T2's answer model, record that; the structure effect then includes it.
+3. If no change was adopted (T2 = T1), skip T2 and say so.
+4. Run T3 even if the agent lost on dev: the comparison is required. Which system is "final" is decided on dev beforehand.
+5. Test confirms the totals. Per-change contributions inside T2 − T1 come from the dev cards' paired results, not from extra test runs.
+6. The structure effect is measured on improved retrieval; on the baseline's retrieval it could differ. State this as a limitation.
+
+Compare T2 vs T1 and T3 vs T2 with `scripts/compare.py` (T3 vs T1 falls out as the total), and write `submission/EVALUATION.md`.
 
 Exit criteria
-- [ ] Test run once per system; no change made after seeing test results
+- [ ] The three configs were committed before the first test run; each system ran once; no change made after seeing test results
 - [ ] submission/EVALUATION.md complete; every causal claim cites question IDs; limitations include noise, dev size, and judge reliability (spot-check 10 graded answers by hand)
 
 ## Rules of thumb

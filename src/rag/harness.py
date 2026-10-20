@@ -83,8 +83,10 @@ def run_experiment(cfg: dict, split: str, *, experiment: str, sets=None, limit: 
         start = time.perf_counter()
         try:
             if retrieval_only:
-                units = system.retrieve(item["question"], scope)
+                steps = {"calls": []}
+                units = system.retrieve(item["question"], scope, steps)
                 result = {"status": "retrieval_only", "context": units, "n_searches": 1, "n_llm_calls": 0,
+                          "steps": steps,
                           "searches": [{"query": item["question"], "chunk_ids": [u["chunk_id"] for u in units]}]}
             else:
                 result = system.run(item["question"], scope)

@@ -63,7 +63,8 @@ python scripts/compare.py dev_000_baseline dev_004_hybrid_retrieval --metric gol
 
 - test split은 `--final` 없이는 실행·채점·평가되지 않는다(워크플로우 8단계에서만).
 - 단계별 명령은 [docs/WORKFLOW.md](docs/WORKFLOW.md)의 "Commands per step".
-- 현재 상태: 공통 기반(설정, 실행 기록, 비용, 평가, 비교표)은 구현·테스트됨. 문서 처리·청킹·검색·RAG·Agent·채점은 함수 시그니처만 있고 `NotImplementedError`를 낸다.
+- 현재 상태: 공통 기반(설정, 실행 기록, 비용, 평가, 비교표)과 기본 RAG(페이지 추출, Recursive 청킹, 벡터 검색, 답변)는 구현·테스트됨. 실험별 방식(구조 단위 청킹, BM25·Hybrid, MMR), Agent, 채점은 함수 시그니처만 있고 `NotImplementedError`를 낸다. 목록: `src/rag/__init__.py`
+- 페이지 추출: `python scripts/extract_pages.py` → `corpus/pages.jsonl` + 진단표(글자가 적은 쪽, 이미지 수)
 
 ## 협업
 

@@ -23,7 +23,7 @@ GOLDEN = [
 
 
 class FakeSystem:
-    def retrieve(self, question, scope):
+    def retrieve(self, question, scope, steps=None):
         return [PAGE, OTHER] if "휴면" in question else [OTHER]
 
     def run(self, question, scope):

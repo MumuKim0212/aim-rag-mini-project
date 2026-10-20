@@ -5,12 +5,19 @@ Implemented here (shared infrastructure, do not fork per experiment):
 - env      : load .env, force tracing off
 - golden   : load golden items, index scope per set, expected status per behavior
 - cost     : USD and token totals from recorded calls (configs/pricing.yaml)
-- llm      : record_call / usage_from_message — every LLM and embedding call goes through record_call
+- llm      : Gemini calls (generate_json, embed, count_tokens) and record_call — every call is recorded
 - repro    : git commit, dirty flag, package versions for every run
 - harness  : batch run / grade / evaluate / report used by scripts/
 
+Baseline pipeline (implemented, tested; frozen once the baseline has run):
+- ingest     : PDF -> pages (PyMuPDF text layer)
+- chunking   : "recursive"
+- retrieval  : index build, "vector" search (Chroma, gemini-embedding-2 with its text prefixes)
+- rag        : BaselineRAG and the shared answer step (generate_answer, map_citations, format_answer)
+
 To implement (stubs raise NotImplementedError; keep the signatures):
-- ingest, chunking, retrieval, rag, agent, judge
+- chunking "structure" (card 002), add_header (003), retrieval "bm25" / "hybrid" (004), mmr (005)
+- agent (008), judge.grade (workflow step 1)
 
 Data contracts are in each module's docstring and in evalkit/README.md.
 """

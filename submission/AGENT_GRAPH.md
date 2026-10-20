@@ -12,7 +12,7 @@ GUIDE: 제출물 "Agent 그래프 구조도". 각 노드의 역할, 노드 간 �
 
 ## 1. 설계 의도
 
-- 기본 RAG와 같은 답변 프롬프트(`prompts/answer_v1.md`)를 쓴다. 차이는 아래 구조뿐이다(PLAN.md 3.3절).
+- 기본 RAG와 같은 답변 프롬프트(`prompts/answer_v1.md`)와 같은 답변 함수(`rag.generate_answer`, `map_citations`, `format_answer`), 같은 검색기(`retrieval.load_retriever`)를 쓴다. 차이는 아래 구조뿐이다(PLAN.md 3.3절).
 - 기본 RAG가 LLM 1회로 하던 판단을 나눈다: 답할 질문인지(classify), 근거가 충분한지(grade), 인용이 맞는지(cite_check).
 - 근거가 부족하면 질문을 고쳐 다시 검색한다(rewrite → retrieve, 최대 2회).
 

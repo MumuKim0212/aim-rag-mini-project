@@ -13,14 +13,15 @@ evalkit.runlog COLUMNS. scripts/run.py adds system, config, question, and latenc
       "n_searches": 1, "n_llm_calls": 1,
     }
 
-retrieve() is the search alone, used for LLM-free comparisons (run.py --retrieval-only).
+retrieve() is the search alone, used for LLM-free comparisons (run.py --retrieval-only); it records its
+query-embedding call into `steps` when given.
 """
 
 from typing import Protocol
 
 
 class System(Protocol):
-    def retrieve(self, question: str, scope: str) -> list[dict]: ...
+    def retrieve(self, question: str, scope: str, steps: dict | None = None) -> list[dict]: ...
 
     def run(self, question: str, scope: str) -> dict: ...
 

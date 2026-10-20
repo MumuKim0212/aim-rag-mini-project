@@ -16,6 +16,15 @@ corpus:
   scopes:                       # file patterns, relative to pdf_dir
     A: [financial_glossary_readable.pdf, "standard_terms/*.pdf"]
     B: ["*.pdf", "*/*.pdf"]
+  titles:                       # document titles for embedding text; unlisted files: name without "NN_" and ".pdf"
+    financial_glossary_readable.pdf: 금융용어 모음
+    financial_life_guide.pdf: 20대를 위한 금융생활 가이드북
+    housing_pension_2026.pdf: 2026 주택연금 백문백답
+    housing_policy_finance_2025.pdf: 우리나라 주택 정책금융 현황과 평가
+    insurance_terms_example_2020.pdf: 보험약관 이해 가이드북
+    policy_finance_debt_adjustment_2026.pdf: 정책서민금융 및 채무조정제도 분석
+    retirement_pension_2025.pdf: 퇴직연금 보도자료 2025
+    self_employed_debt_2025.pdf: 최근 자영업자의 채무상환능력 평가 및 시사점
   set_scope:                    # golden `set` -> index scope
     base_positive: A
     base_negative: A
@@ -32,7 +41,10 @@ chunking:
 embedding:
   model: gemini-embedding-2
   dimensions: 3072
-  task_type: null               # gemini-embedding-001 only (gemini-embedding-2 does not accept it)
+  task_type: null               # gemini-embedding-001 only: "retrieval" -> RETRIEVAL_QUERY / RETRIEVAL_DOCUMENT
+  text_format: gemini2_qa       # gemini-embedding-2 has no task_type; the docs prescribe text prefixes instead:
+                                #   query "task: question answering | query: …", document "title: … | text: …"
+                                # none = embed raw text. Only the vectors change; chunk content is unchanged.
 
 retrieval:
   method: vector                # vector | bm25 | hybrid
