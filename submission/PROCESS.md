@@ -31,7 +31,7 @@ GUIDE: 진행 과정 기록. docs/WORKFLOW.md의 단계 순서대로, 무엇을 
 
 ### 0. 환경과 제약
 
-- 모델: Gemini 안정 모델만 사용(preview, 2.5 제한 접근 모델 제외). 답변 후보 `gemini-3.1-flash-lite`, `gemini-3.5-flash-lite`, `gemini-3.8-flash`(기준). 채점 `gemini-3.6-flash` 고정. 임베딩 `gemini-embedding-2`(기준), `gemini-embedding-001`(비교). ID·단가는 [PLAN.md](PLAN.md) 4절 (2026-10-20 결정)
+- 모델: Gemini 안정 모델만 사용(preview, 2.5 제한 접근 모델 제외). 답변 후보 `gemini-3.1-flash-lite`, `gemini-3.5-flash-lite`, `gemini-3.8-flash`(기준 설정의 출발점, 최종 답변 모델은 카드 007로 결정). 채점 `gemini-3.6-flash` 고정. 임베딩 `gemini-embedding-2`(기준), `gemini-embedding-001`(비교). ID·단가는 [PLAN.md](PLAN.md) 4절 (2026-10-20 결정)
 - 마감: 2026-10-22(목). 일정과 시간이 부족할 때 줄이는 순서는 PLAN.md 9절
 - 답변 실행: 001–006은 개선 여지 확인을 통과할 때만 실행한다. 007·008은 답변 단계를 바꾸는 비교라 LLM 없는 대리 지표가 없으므로 항상 실행한다 (2026-10-20 결정)
 - 최종 test: T1 처음 RAG / T2 개선된 RAG / T3 Agent를 한 번씩 실행해 튜닝 효과(T2 − T1)와 구조 효과(T3 − T2)를 나눈다 (PLAN.md 3.2절, 2026-10-20 결정)
