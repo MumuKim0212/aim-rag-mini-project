@@ -113,7 +113,7 @@ def test_prompt_and_answer_step(cfg, monkeypatch):
     monkeypatch.setattr(llm, "generate_json", generate_json)
     monkeypatch.setattr(rag, "load_retriever", lambda c, scope: FakeRetriever())
     result = rag.BaselineRAG(cfg).run("휴면성 증권계좌는?", "A")
-    assert seen["model"] == "gemini-3.8-flash" and seen["thinking_level"] == "low"
+    assert seen["model"] == "gemini-3.5-flash-lite" and seen["thinking_level"] == "low"
     assert "[1] (a.pdf, p.3)" in seen["user"] and "휴면성 증권계좌는?" in seen["user"]
     assert result["status"] == "answered" and result["citations"] == citations
     assert result["steps"]["invalid_citations"] == [9] and result["n_llm_calls"] == 1

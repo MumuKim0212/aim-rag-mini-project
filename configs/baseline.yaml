@@ -4,7 +4,7 @@
 
 name: 000_baseline
 card: null
-description: Recursive 800/100, vector k=5, gemini-3.8-flash, shared answer prompt
+description: Recursive 800/100, vector k=5, gemini-3.5-flash-lite, shared answer prompt
 
 system: rag                     # rag | agent
 
@@ -55,9 +55,9 @@ retrieval:
   bm25_tokenizer: kiwi
 
 answer:
-  model: gemini-3.8-flash
+  model: gemini-3.5-flash-lite  # baseline answer model (2026-10-20); card 007 compares 3.1-flash-lite and 3.8-flash
   prompt: prompts/answer_v1.md
-  temperature: 0                # ignored by gemini-3.6-flash and gemini-3.5-flash-lite (fixed sampling)
+  temperature: 0                # ignored by gemini-3.5-flash-lite and gemini-3.6-flash (fixed sampling): measure answer noise (step 3a)
   thinking_level: low           # low | high; verified 2026-10-20 on all four candidates (submission/PROCESS.md §0)
 
 agent:                          # used when system: agent
