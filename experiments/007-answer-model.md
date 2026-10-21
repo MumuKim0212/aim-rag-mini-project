@@ -68,3 +68,9 @@ Runs `dev_007_lite31`, `dev_007_flash38` (2026-10-21, dev 90, 0 errors). Reused:
 - Why, with question IDs: the gain over the chain is on advanced questions (0.569 → 0.724), over-abstention and negative handling (ADD-HF06 ADD-HP06 ADD-HP10 ADD-IN01 NEG023 NEG025 NEG039 improved; only NEG022 worse), and 3.8-flash does not use thinking tokens at `low`, so it is a model effect. H5 (small gap on basic, larger on advanced and negative) is partly supported: basic 0.816 → 0.895, advanced 0.569 → 0.724; `base_negative` 0.825 → 0.875.
 - Cost and time: +0.0015 USD per question (answer), +1.7–1.9 s median latency. Over 90 questions that is +0.14 USD.
 - What the criteria missed: the latency bullet was ambiguous (check or gate), the `scripts/garble_scan.py` heuristic fails for thinking models, and "cheaper" 3.1-flash-lite turned out dearer than 3.5-flash-lite because of thinking tokens. Nothing was changed after the results. The score of 3.8-flash vs 3.1-flash-lite (0.850 vs 0.833) was not compared directly and is not claimed.
+
+## 8. Addendum — owner decision (2026-10-21, after the results above)
+
+- The project owner ordered `gemini-3.6-flash` as the answer model ("3.6 flash로 그냥 컨펌하고 해"), a model that was not a candidate of this card and that is also the judge model (`configs/baseline.yaml` `judge.model`). This overrides the section 6 decision for the answer model; the results above are unchanged.
+- Consequence recorded here: the judge grades answers written by the same model, which can favour them (self-preference). The judge stays `gemini-3.6-flash` and `judge_v1` as everywhere else, because changing it would invalidate every graded run. To be stated as a limitation in EVALUATION.md.
+- Measured for the record and as the answer baseline of card 008: `configs/007-flash36.yaml`, experiment `dev_007_flash36` (same chain, `thinking_level: low`). No adopt criteria apply; the result is reported against `dev_004_hybrid` and `dev_007_flash38`.
