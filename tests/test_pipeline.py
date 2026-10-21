@@ -204,3 +204,54 @@ def test_add_header_labels_every_chunk_and_restores_the_article_heading(cfg):
     cfg["chunking"]["method"] = "recursive"
     with pytest.raises(NotImplementedError):
         chunking.chunk_pages(pages, cfg)
+
+
+@pytest.fixture
+def small_index(tmp_path, monkeypatch, cfg, fake_llm):
+    monkeypatch.setattr(retrieval, "INDEX_ROOT", tmp_path / "index")
+    cfg["embedding"]["text_format"] = "none"
+    texts = ["휴면성 증권계좌는 6개월 이상 매매가 없는 계좌", "신용거래의 철회기간은 14일입니다",
+             "연금저축 승계는 배우자만 가능합니다", "공매도는 주식을 빌려서 먼저 파는 거래입니다",
+             "휴면성 증권계좌는 6개월 이상 매매가 없는 계좌 (복사본)"]
+    chunks = [{"chunk_id": f"c{i}", "source": "a.pdf", "page": i, "content": t, "pages": [i]} for i, t in enumerate(texts, 1)]
+    retrieval.build_index(chunks, cfg, "A")
+    return cfg
+
+
+def test_bm25_ranks_by_content_morphemes_and_needs_no_embedding_call(small_index):
+    small_index["retrieval"].update(method="bm25", k=2)
+    steps = {}
+    units = retrieval.load_retriever(small_index, "A").search("공매도가 뭔가요", steps)
+    assert units[0]["chunk_id"] == "c4" and len(units) == 2 and units[0]["score"] > units[1]["score"]
+    assert "calls" not in steps and steps["search_seconds"]                     # no embedding call, search time recorded
+    assert retrieval.kiwi_tokens("연금저축을 해지하고") == ["연금", "저축", "해지"]  # particles and endings dropped
+
+
+def test_hybrid_fuses_both_lists_and_alpha_extremes_match_the_parts(small_index):
+    small_index["retrieval"].update(method="hybrid", k=3, hybrid_alpha=0.5)
+    query = "휴면성 증권계좌는 어떤 계좌인가요"
+    fused = retrieval.load_retriever(small_index, "A").search(query, {})
+    assert len(fused) == 3 and all(0.0 <= u["score"] <= 1.0 for u in fused)
+    small_index["retrieval"]["hybrid_alpha"] = 1.0
+    only_vector = [u["chunk_id"] for u in retrieval.load_retriever(small_index, "A").search(query, {})]
+    small_index["retrieval"].update(method="vector")
+    assert only_vector == [u["chunk_id"] for u in retrieval.load_retriever(small_index, "A").search(query, {})]
+    small_index["retrieval"].update(method="hybrid", hybrid_alpha=0.0)
+    only_bm25 = [u["chunk_id"] for u in retrieval.load_retriever(small_index, "A").search(query, {})]
+    small_index["retrieval"].update(method="bm25")
+    bm25_units = retrieval.load_retriever(small_index, "A").search(query, {})
+    matching = [u["chunk_id"] for u in bm25_units if u["score"] > 0]
+    assert matching and only_bm25[:len(matching)] == matching                   # zero-score ties are ordered by vector score in hybrid
+
+
+def test_mmr_skips_the_near_duplicate(small_index):
+    small_index["retrieval"].update(method="vector", k=2)
+    query = "휴면성 증권계좌는 6개월 이상 매매가 없는 계좌"
+    plain = [u["chunk_id"] for u in retrieval.load_retriever(small_index, "A").search(query, {})]
+    assert set(plain) == {"c1", "c5"}                                          # the original and its copy
+    small_index["retrieval"].update(mmr=True, mmr_lambda=0.3)
+    diverse = [u["chunk_id"] for u in retrieval.load_retriever(small_index, "A").search(query, {})]
+    assert len(diverse) == 2 and diverse[0] in ("c1", "c5") and set(diverse) != {"c1", "c5"}
+    small_index["retrieval"].update(method="bm25")
+    with pytest.raises(NotImplementedError):
+        retrieval.load_retriever(small_index, "A")

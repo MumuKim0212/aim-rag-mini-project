@@ -21,7 +21,9 @@ from pathlib import Path
 from typing import Callable
 
 import chromadb
+import numpy as np
 from chromadb.config import Settings
+from rank_bm25 import BM25Okapi
 
 from . import ROOT, llm
 from .ingest import title_of
@@ -120,43 +122,147 @@ def load_retriever(cfg: dict, scope: str):
     return RETRIEVERS[method](cfg, scope)
 
 
+def _load_chunks(cfg: dict, scope: str) -> tuple[Path, dict]:
+    directory = index_dir(cfg, scope)
+    if not (directory / "build.json").exists():
+        raise FileNotFoundError(f"no index for scope {scope} ({directory}); run scripts/build_index.py first")
+    with (directory / "chunks.jsonl").open(encoding="utf-8") as f:
+        return directory, {c["chunk_id"]: c for c in map(json.loads, f)}
+
+
 @register("vector")
 class VectorRetriever:
     def __init__(self, cfg: dict, scope: str):
-        if cfg["retrieval"].get("mmr"):
-            raise NotImplementedError("retrieval.mmr — card 005")
-        self.cfg, self.dir = cfg, index_dir(cfg, scope)
-        build = self.dir / "build.json"
-        if not build.exists():
-            raise FileNotFoundError(f"no index for scope {scope} ({self.dir}); run scripts/build_index.py first")
-        self.tokens_per_char = json.loads(build.read_text(encoding="utf-8"))["tokens_per_char"] or 0.0
-        with (self.dir / "chunks.jsonl").open(encoding="utf-8") as f:
-            self.chunks = {c["chunk_id"]: c for c in map(json.loads, f)}
+        self.cfg = cfg
+        self.dir, self.chunks = _load_chunks(cfg, scope)
+        self.tokens_per_char = json.loads((self.dir / "build.json").read_text(encoding="utf-8"))["tokens_per_char"] or 0.0
         self.collection = _collection(self.dir)
         self._lock = threading.Lock()
+
+    def _embed_query(self, query: str, steps: dict) -> list[float]:
+        text = query_text(query, self.cfg)
+        [vector] = llm.embed([text], embedding_cfg=self.cfg["embedding"], purpose="query", steps=steps,
+                             node="query_embed", tokens=round(len(text) * self.tokens_per_char), estimated=True)
+        return vector
+
+    def search_n(self, query: str, n: int, steps: dict) -> list[dict]:
+        """The n nearest chunks by cosine similarity, best first (score = similarity)."""
+        vector = self._embed_query(query, steps)
+        with self._lock:
+            hits = self.collection.query(query_embeddings=[vector], n_results=n, include=["distances"])
+        return [{**self.chunks[cid], "score": round(1 - dist, 4)} for cid, dist in zip(hits["ids"][0], hits["distances"][0])]
+
+    def _mmr(self, query: str, k: int, steps: dict) -> list[dict]:
+        """Maximal marginal relevance over the nearest max(4k, 20) chunks: pick the chunk that maximises
+        lambda * sim(query, chunk) - (1 - lambda) * max sim(chunk, already picked)."""
+        weight = self.cfg["retrieval"]["mmr_lambda"]
+        vector = self._embed_query(query, steps)
+        with self._lock:
+            hits = self.collection.query(query_embeddings=[vector], n_results=max(4 * k, 20),
+                                         include=["distances", "embeddings"])
+        ids = hits["ids"][0]
+        vectors = np.asarray(hits["embeddings"][0], dtype=float)
+        vectors = vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
+        relevance = [1 - d for d in hits["distances"][0]]
+        picked: list[int] = []
+        while len(picked) < min(k, len(ids)):
+            best, best_score = None, -np.inf
+            for j in range(len(ids)):
+                if j in picked:
+                    continue
+                redundancy = max((float(vectors[j] @ vectors[i]) for i in picked), default=0.0)
+                score = weight * relevance[j] - (1 - weight) * redundancy
+                if score > best_score:
+                    best, best_score = j, score
+            picked.append(best)
+        return [{**self.chunks[ids[j]], "score": round(relevance[j], 4)} for j in picked]
 
     def search(self, query: str, steps: dict | None = None) -> list[dict]:
         steps = steps if steps is not None else {}
         start = time.perf_counter()
-        text = query_text(query, self.cfg)
-        [vector] = llm.embed([text], embedding_cfg=self.cfg["embedding"], purpose="query", steps=steps,
-                             node="query_embed", tokens=round(len(text) * self.tokens_per_char), estimated=True)
-        with self._lock:
-            hits = self.collection.query(query_embeddings=[vector], n_results=self.cfg["retrieval"]["k"],
-                                         include=["distances"])
-        units = [{**self.chunks[cid], "score": round(1 - dist, 4)}
-                 for cid, dist in zip(hits["ids"][0], hits["distances"][0])]
+        r = self.cfg["retrieval"]
+        units = self._mmr(query, r["k"], steps) if r.get("mmr") else self.search_n(query, r["k"], steps)
         steps.setdefault("search_seconds", []).append(round(time.perf_counter() - start, 3))
         return units
 
 
+KEEP_TAGS = ("NNG", "NNP", "VV", "VA", "XR", "SL", "SN")  # content morphemes; particles and endings are dropped
+_KIWI = None
+_KIWI_LOCK = threading.Lock()
+
+
+def kiwi_tokens(text: str) -> list[str]:
+    """Content morphemes of a Korean text (Kiwi): common/proper nouns, verb/adjective stems, roots, foreign
+    words, numbers. Latin words are lower-cased."""
+    global _KIWI
+    with _KIWI_LOCK:
+        if _KIWI is None:
+            from kiwipiepy import Kiwi
+            _KIWI = Kiwi()
+        tokens = _KIWI.tokenize(text)
+    return [t.form.lower() for t in tokens if t.tag in KEEP_TAGS]
+
+
 @register("bm25")
 class BM25Retriever:
+    """BM25 (Okapi, rank_bm25 defaults) over Kiwi tokens of the chunks of the scope's index. It reads the same
+    chunks.jsonl as the vector retriever, so it needs the index of the config's chunking/embedding but makes
+    no embedding calls."""
+
     def __init__(self, cfg: dict, scope: str):
-        raise NotImplementedError("card 004")
+        if cfg["retrieval"].get("mmr"):
+            raise NotImplementedError("retrieval.mmr is implemented for method 'vector' only")
+        if cfg["retrieval"].get("bm25_tokenizer", "kiwi") != "kiwi":
+            raise KeyError(f"unknown retrieval.bm25_tokenizer {cfg['retrieval']['bm25_tokenizer']!r}")
+        self.cfg = cfg
+        _, self.chunks = _load_chunks(cfg, scope)
+        self.ids = list(self.chunks)
+        self.bm25 = BM25Okapi([kiwi_tokens(self.chunks[i]["content"]) or ["_"] for i in self.ids])
+
+    def search_n(self, query: str, n: int, steps: dict | None = None) -> list[dict]:
+        scores = self.bm25.get_scores(kiwi_tokens(query))
+        order = sorted(range(len(self.ids)), key=lambda i: (-scores[i], i))[:n]  # ties: earlier chunk first
+        return [{**self.chunks[self.ids[i]], "score": round(float(scores[i]), 4)} for i in order]
+
+    def search(self, query: str, steps: dict | None = None) -> list[dict]:
+        steps = steps if steps is not None else {}
+        start = time.perf_counter()
+        units = self.search_n(query, self.cfg["retrieval"]["k"])
+        steps.setdefault("search_seconds", []).append(round(time.perf_counter() - start, 3))
+        return units
+
+
+def min_max(units: list[dict]) -> dict[str, float]:
+    """chunk_id -> score scaled to [0, 1] within one ranked list (1.0 for all if the scores are equal)."""
+    if not units:
+        return {}
+    low, high = min(u["score"] for u in units), max(u["score"] for u in units)
+    return {u["chunk_id"]: (u["score"] - low) / (high - low) if high > low else 1.0 for u in units}
 
 
 @register("hybrid")
 class HybridRetriever:
+    """Weighted score fusion: alpha * vector + (1 - alpha) * BM25, each min-max scaled within its own list of
+    candidates (retrieval.hybrid_alpha); a chunk missing from one list scores 0 there. Each list holds the
+    top max(4k, 20) chunks."""
+
     def __init__(self, cfg: dict, scope: str):
-        raise NotImplementedError("card 004")
+        if cfg["retrieval"].get("mmr"):
+            raise NotImplementedError("retrieval.mmr is implemented for method 'vector' only")
+        self.cfg = cfg
+        self.vector, self.bm25 = VectorRetriever(cfg, scope), BM25Retriever(cfg, scope)
+
+    def search(self, query: str, steps: dict | None = None) -> list[dict]:
+        steps = steps if steps is not None else {}
+        start = time.perf_counter()
+        r = self.cfg["retrieval"]
+        n = max(4 * r["k"], 20)
+        from_vector, from_bm25 = self.vector.search_n(query, n, steps), self.bm25.search_n(query, n)
+        scaled_v, scaled_b = min_max(from_vector), min_max(from_bm25)
+        units = {u["chunk_id"]: u for u in from_vector + from_bm25}
+        fused = {cid: r["hybrid_alpha"] * scaled_v.get(cid, 0.0) + (1 - r["hybrid_alpha"]) * scaled_b.get(cid, 0.0)
+                 for cid in units}
+        best = sorted(fused, key=lambda cid: (-fused[cid], -scaled_v.get(cid, 0.0), cid))[:r["k"]]
+        result = [{**units[cid], "score": round(fused[cid], 4)} for cid in best]
+        steps.setdefault("search_seconds", []).append(round(time.perf_counter() - start, 3))
+        return result

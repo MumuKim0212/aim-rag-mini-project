@@ -1,6 +1,6 @@
 # 실험 결과 요약
 
-생성: 2026-10-21T14:21:49 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
+생성: 2026-10-21T14:36:24 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
 
 | 실험 | 카드 | 변경 | n | 정답 점수 | 완전 정답 | 대응 일치 | 인용 정확 | page_hit@5 | evid@5 | gold@5 | USD/문항 | 토큰/문항 | LLM 호출/문항 | p50 s | p90 s | 비용 USD | 기준 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -12,7 +12,10 @@
 | dev_001_chunk400_retrieval | experiments/001-chunk-size.md | chunking.chunk_overlap: 100 → 50, chunking.chunk_size: 800 → 400 | 90 | – | – | – | – | 0.905 (+0.027) | 0.675 (-0.022) | 2.49 (+0.57) | 0.00002 (-0.00115) | 77 (-2840) | 0.00 (-1.00) | 0.48 (-1.10) | 0.53 (-1.54) | 0.0014 | dev_000_baseline |
 | dev_001_chunk600_retrieval | experiments/001-chunk-size.md | chunking.chunk_overlap: 100 → 75, chunking.chunk_size: 800 → 600 | 90 | – | – | – | – | 0.946 (+0.068) | 0.706 (+0.008) | 2.14 (+0.22) | 0.00002 (-0.00115) | 77 (-2839) | 0.00 (-1.00) | 0.48 (-1.10) | 0.54 (-1.52) | 0.0014 | dev_000_baseline |
 | dev_002_structure | experiments/002-structure.md | chunking.method: recursive → structure | 50 | 0.830 (+0.108) | 74.0% (+17.3%) | 86.0% (+3.8%) | 94.1% (+13.0%) | 1.000 (+0.122) | 0.950 (+0.253) | 1.88 (-0.04) | 0.00083 (-0.00033) | 1931 (-986) | 1.00 | 1.64 (+0.06) | 2.23 (+0.17) | 0.0415 | dev_000_baseline |
+| dev_002_structure_all_retrieval | experiments/002-structure.md | chunking.method: recursive → structure | 90 | – | – | – | – | 0.960 (+0.081) | 0.789 (+0.092) | 2.07 (+0.15) | 0.00002 (-0.00115) | 76 (-2840) | 0.00 (-1.00) | 0.48 (-1.10) | 0.53 (-1.54) | 0.0014 | dev_000_baseline |
 | dev_002_structure_B_retrieval | experiments/002-structure.md | chunking.method: recursive → structure | 40 | – | – | – | – | 0.925 (+0.047) | 0.652 (-0.045) | 2.23 (+0.31) | 0.00002 (-0.00114) | 96 (-2820) | 0.00 (-1.00) | 0.49 (-1.09) | 2.27 (+0.21) | 0.0008 | dev_000_baseline |
 | dev_002_structure_retrieval | experiments/002-structure.md | chunking.method: recursive → structure | 50 | – | – | – | – | 1.000 (+0.122) | 0.950 (+0.253) | 1.88 (-0.04) | 0.00001 (-0.00115) | 60 (-2856) | 0.00 (-1.00) | 0.48 (-1.10) | 0.54 (-1.53) | 0.0006 | dev_000_baseline |
 | dev_003_header_B_retrieval | experiments/003-header.md | chunking.add_header: False → True, chunking.method: recursive → structure | 40 | – | – | – | – | 0.925 (-0.075) | 0.652 (-0.298) | 2.23 (+0.34) | 0.00002 (-0.00081) | 97 (-1834) | 0.00 (-1.00) | 0.50 (-1.14) | 2.35 (+0.12) | 0.0008 | dev_002_structure |
 | dev_003_header_retrieval | experiments/003-header.md | chunking.add_header: False → True, chunking.method: recursive → structure | 50 | – | – | – | – | 0.971 (-0.029) | 0.921 (-0.029) | 1.82 (-0.06) | 0.00001 (-0.00082) | 61 (-1869) | 0.00 (-1.00) | 0.49 (-1.14) | 0.56 (-1.67) | 0.0006 | dev_002_structure |
+| dev_004_bm25_retrieval | experiments/004-retrieval-method.md | chunking.method: recursive → structure, retrieval.method: vector → bm25 | 90 | – | – | – | – | 0.892 (-0.068) | 0.714 (-0.075) | 1.66 (-0.41) | 0.00000 (-0.00002) | 0 (-76) | 0.00 | 0.02 (-0.47) | 0.10 (-0.43) | 0.0000 | dev_002_structure_all_retrieval |
+| dev_004_hybrid_retrieval | experiments/004-retrieval-method.md | chunking.method: recursive → structure, retrieval.method: vector → hybrid | 90 | – | – | – | – | 0.973 (+0.013) | 0.804 (+0.015) | 1.97 (-0.09) | 0.00002 | 76 | 0.00 | 0.49 (+0.01) | 1.49 (+0.96) | 0.0014 | dev_002_structure_all_retrieval |
