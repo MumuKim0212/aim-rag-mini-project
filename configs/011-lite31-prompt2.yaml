@@ -1,0 +1,7 @@
+base: 007-lite31.yaml
+name: 011_lite31_prompt2
+card: experiments/011-answer-prompt-v2.md
+description: gemini-3.1-flash-lite on the adopted structure + vector setup, answer prompt v2 (explicit clarify / refuse / abstain instructions)
+compare_to: dev_007_lite31
+answer:
+  prompt: prompts/answer_v2.md

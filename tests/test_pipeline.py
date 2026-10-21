@@ -255,3 +255,11 @@ def test_mmr_skips_the_near_duplicate(small_index):
     small_index["retrieval"].update(method="bm25")
     with pytest.raises(NotImplementedError):
         retrieval.load_retriever(small_index, "A")
+
+
+def test_answer_prompt_v2_keeps_the_contract_of_v1():
+    v1, v2 = rag.load_prompt("prompts/answer_v1.md"), rag.load_prompt("prompts/answer_v2.md")
+    assert v2["user"] == v1["user"] and "{question}" in v2["user"] and "{context}" in v2["user"]
+    for status in ("answered", "abstained", "clarify", "refused"):
+        assert status in v2["system"]
+    assert '"citations"' in v2["system"] and len(v2["system"]) > len(v1["system"])
