@@ -1,0 +1,8 @@
+base: 007-flash36.yaml
+name: 008_agent
+card: experiments/008-agent.md
+compare_to: dev_007_flash36
+description: "Agent graph (classify, grade, rewrite + re-search, cite_check) on the final RAG chain; same retrieval, prompt and answer model"
+system: agent
+agent:
+  max_context: 10
