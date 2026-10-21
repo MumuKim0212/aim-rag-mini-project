@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 005: Number of retrieved chunks k = 3 / 5 / 8
 
-Status: planned
+Status: decided (k stays 5 by the criteria; k=8 missed the context cap by 1.0%; no answer run)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -39,19 +39,23 @@ Date: 2026-10-21
 
 | Config | evid (dev) | Net vs chain (+/−) | Context chars |
 |---|---|---|---|
-| k=3 | | | |
+| k=3 | 0.772 | 0 up / 16 down, net −16 | 1,758 (0.58×) |
 | k=5 (chain) | 0.853 | – | 3,034 |
-| k=8 | | | |
+| k=8 | 0.896 | 8 up / 0 down, net +8 | 4,599 (1.52×) |
 
-- Details: _..._
-- Gates passed? _..._
+Runs `dev_005_k3_retrieval`, `dev_005_k8_retrieval` (2026-10-21, 74 dev questions with gold pages). Other numbers (k=3 / 5 / 8): `page_hit` 0.973 / 0.986 / 0.986, `gold` 1.62 / 2.11 / 2.45. Questions with all evidence in context: 39 / 50 / 55; with none: 4 / 2 / 2.
+
+- k=3 worsened: POS026 POS044 POS050 POS052 POS051 POS059 POS058 POS061 POS070 POS078 POS079 ADD-HP04 ADD-RP05 ADD-HF05 ADD-SE03 ADD-IN10 (none improved, as expected for fewer chunks).
+- k=8 improved: POS047 POS050 POS059 POS064 ADD-RP06 ADD-HF10 ADD-IN01 ADD-IN08 (none worsened).
+- Gates: **k=8**: `evid` +0.043 passes (≥ +0.03), net +8 passes (≥ 5), context 4,599 characters is over the cap 4,551 (1.516× vs 1.5×) → **fails the cap**, rejected by the rule; no headroom check. **k=3**: context 0.58× passes, `evid` 0.772 is under the floor 0.823 (chain − 0.03) → **fails**; no answer run.
 
 ## 6. Answer run (only if the gates passed)
 
-_..._
+Not run: neither variant passed its gate. LLM calls used: 0.
 
 ## 7. Decision and notes
 
-- Decision: _..._
-- Why, with question IDs: _..._
-- What the criteria missed, if anything: _..._
+- Decision by the criteria: **k stays 5.** MMR was not run (see section 1).
+- Why, with question IDs: k=3 loses evidence for 16 questions and improves none, for 42% less context; k=8 is the best of the three on evidence (+0.043, 8 questions better, none worse, 55 questions with all evidence in context vs 50) but costs 52% more context characters and misses the pre-registered cap by 48 characters on average (1.0%). The cap was not changed after seeing the number.
+- Open option for the owner: adopting k=8 despite the cap is a cost-for-evidence trade (about +1,560 characters, roughly +40% answer-input tokens, estimated from the characters; not measured) with no answer-level measurement. If adopted by the owner, the chain answer run `dev_004_hybrid` is no longer the baseline and the answer-model comparison (card 007) should be rerun on k=8.
+- What the criteria missed, if anything: nothing was changed after the results. A cap of exactly 1.5× made the decision hinge on a 1% margin.
