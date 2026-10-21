@@ -30,7 +30,7 @@ def rerank(question: str, pool: list[dict], k: int, model: str, cfg: dict, steps
     ranked, failed = [], False
     try:
         a = cfg["answer"]
-        ranked = llm.generate_json(model=model, system=prompt["system"],
+        ranked = llm.generate_json(model=model, system=fill(prompt["system"], k=str(k)),
                                    user=fill(prompt["user"], question=question, context=context, k=str(k)),
                                    schema=RerankOut, temperature=a.get("temperature"), thinking_level=a.get("thinking_level"),
                                    steps=steps, node="rerank", retries=cfg["run"]["max_retries"],
