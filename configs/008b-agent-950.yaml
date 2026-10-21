@@ -1,0 +1,8 @@
+base: 001e-chunk950-chain.yaml
+name: 008b_agent950
+card: experiments/008-agent.md
+compare_to: dev_001e_chunk950chain
+description: "Agent graph on the final RAG chain with Recursive 950/119 (T3 of the final test; same retrieval, prompt, answer model as T2)"
+system: agent
+agent:
+  max_context: 10
