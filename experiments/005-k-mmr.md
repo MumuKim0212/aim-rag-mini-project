@@ -50,7 +50,7 @@ Date: 2026-10-21
 
 dev 90문항 전체(evid 계산 74문항), `--retrieval-only`, 인덱스 재사용. 실험 이름 `dev_005_{k3,k8,mmr}_retrieval`. 지표는 `evid`(문맥의 근거 구절 포함률). 순증은 evid가 오른 문항 − 내린 문항.
 
-| Config | evid (dev 74) | Net vs baseline (+/−) | Context chars (90문항 평균) | 서로 다른 페이지 수 / 문서 수 |
+| Config | evid (dev 74) | Net vs baseline (+/−) | Context chars (문맥이 있는 74문항 평균) | 서로 다른 페이지 수 / 문서 수 |
 |---|---|---|---|---|
 | baseline k=5 | 0.789 | – | 2,331 | 3.77 / 1.78 |
 | k=3 | 0.718 | −16 (0 / 16), diff −0.071, 95% CI [−0.109, −0.036] | 1,413 (0.61배) | 2.44 / 1.40 |

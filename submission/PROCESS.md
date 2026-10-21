@@ -36,6 +36,7 @@ GUIDE: 진행 과정 기록. docs/WORKFLOW.md의 단계 순서대로, 무엇을 
 | 카드 004 검색 방식 vector / BM25 / Hybrid (구조 청킹 위, 전체 dev 90) | 6 | henry | 완료 | Henry | 2026-10-21 |
 | 카드 005 검색량 k=3 / 8과 MMR (구조 청킹 + 벡터 위, 전체 dev 90) | 6 | henry | 완료 | Henry | 2026-10-21 |
 | 카드 006 임베딩 모델 gemini-embedding-001 (구조 청킹 + 벡터 위, 전체 dev 90) | 6 | henry | 완료 | Henry | 2026-10-21 |
+| 카드 009 청킹 3종 최종 비교 (구조 / Recursive 800/100 / 1000/125, 검색 구성 고정; 새 실행 없음, 답변 수준 비교는 승인 대기) | 6 | henry | 검토 중 | Henry | 2026-10-21 |
 
 상태 값: `대기` / `진행 중` / `검토 중` / `완료` / `보류`
 
@@ -243,6 +244,7 @@ _이 수치보다 작은 차이는 결과로 해석하지 않는다._
 | 004 | 검색 방식 BM25(Kiwi) / Hybrid α0.5 (구조 청킹 위, dev 90) | 불통과: 선택된 hybrid evid@5 0.789 → 0.804, 순증 +5 ≤ 잡음 14 (bm25는 −4) | upside 9 / risk 7 → 2 ≤ 14 | 생략 | 기각, 벡터 유지. hybrid는 additional 0.612 → 0.691로 올리고 base_positive 0.943 → 0.909로 내림. BM25 단독은 용어 문항에서 크게 하락 (`experiments/004-retrieval-method.md`) |
 | 005 | 검색량 k=3 / 8, MMR(λ0.5) (구조 청킹 + 벡터 위, dev 90) | 불통과: k=8은 evid +16이지만 문맥 1.60배로 상한 초과, mmr −22, k=3 −16 | k=8 upside 8 / risk 0 → 8 ≤ 14, mmr −21 | 생략 | 기각, k=5 유지. evid는 k와 문맥 길이를 맞바꾸는 관계, MMR은 페이지를 넓히지만 근거 포함률을 낮춤 (`experiments/005-k-mmr.md`) |
 | 006 | 임베딩 gemini-embedding-001 (task_type retrieval, 접두어 없음; 구조 청킹 + 벡터 위, dev 90) | 불통과: evid@5 0.789 → 0.843, 순증 +5 ≤ 잡음 14 (additional 0.612 → 0.762, base_positive 0.943 → 0.912) | upside 8 / risk 9 → −1 ≤ 14 | 생략 | 기각, gemini-embedding-2 유지. 인덱스 0.099 USD(단가 0.15 USD/1M은 미확인) (`experiments/006-embedding.md`) |
+| 009 | 청킹 3종 비교 (R800 / R1000 / 구조, 벡터 k=5 + gemini-embedding-2 고정, dev 90) | 전체 게이트 기준으로는 둘 다 불통과 (R1000 +10, 구조 +9 ≤ 14). 구조는 범위 A 한정 기준(카드 002)에서 통과. evid@5 0.697 / 0.764 / 0.789, 문맥 3,064 / 3,705 / 2,331자 | headroom R1000 5, 구조 7 (≤ 14) | 생략 (카드 002의 범위 A 답변 실행만 있음) | 잠정: 구조 청킹. 구조 − R1000 순증 −1로 구분되지 않아 문맥이 짧은 쪽을 고름. 답변 수준 직접 비교 없음 (`experiments/009-chunking-final.md`) |
 
 각 실험의 자세한 내용은 `experiments/NNN-*.md`에 있다. 여기에는 결정과 그 이유를 한두 줄로 남긴다.
 

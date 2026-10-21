@@ -51,7 +51,7 @@ Date: 2026-10-21
 
 dev 90문항 전체(evid@5 계산 74문항), `--retrieval-only`. 실험 이름 `dev_004_bm25_retrieval`, `dev_004_hybrid_retrieval`. 인덱스는 새로 만들지 않았다. 순증은 evid@5가 오른 문항 − 내린 문항.
 
-| Config | evid@5 (dev 74) | Net vs baseline (+/−) | page_hit@5 | MRR | gold@5 | Context chars (90문항 평균) |
+| Config | evid@5 (dev 74) | Net vs baseline (+/−) | page_hit@5 | MRR | gold@5 | Context chars (문맥이 있는 74문항 평균) |
 |---|---|---|---|---|---|---|
 | structure + vector (baseline) | 0.789 | – | 0.960 | 0.894 | 2.07 | 2,331 |
 | bm25 | 0.714 | −4 (14 / 18), diff −0.075, 95% CI [−0.155, +0.006] | 0.892 | 0.752 | 1.66 | 2,496 (1.07배) |
