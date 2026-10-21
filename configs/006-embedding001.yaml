@@ -1,0 +1,9 @@
+base: 002-structure.yaml
+name: 006_embedding001
+card: experiments/006-embedding.md
+description: Structure chunking (card 002), vector k=5, embedding gemini-embedding-001 with its own protocol (task_type retrieval, no text prefixes)
+compare_to: dev_002_structure_all_retrieval
+embedding:
+  model: gemini-embedding-001
+  task_type: retrieval
+  text_format: none

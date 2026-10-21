@@ -1,6 +1,6 @@
 # 실험 결과 요약
 
-생성: 2026-10-21T14:39:14 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
+생성: 2026-10-21T14:42:21 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
 
 | 실험 | 카드 | 변경 | n | 정답 점수 | 완전 정답 | 대응 일치 | 인용 정확 | page_hit@5 | evid@5 | gold@5 | USD/문항 | 토큰/문항 | LLM 호출/문항 | p50 s | p90 s | 비용 USD | 기준 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -22,3 +22,4 @@
 | dev_005_k3_retrieval | experiments/005-k-mmr.md | chunking.method: recursive → structure, retrieval.k: 5 → 3 | 90 | – | – | – | – | 0.932 (-0.027) | 0.718 (-0.071) | 1.61 (-0.46) | 0.00002 | 76 | 0.00 | 0.50 (+0.02) | 0.63 (+0.10) | 0.0014 | dev_002_structure_all_retrieval |
 | dev_005_k8_retrieval | experiments/005-k-mmr.md | chunking.method: recursive → structure, retrieval.k: 5 → 8 | 90 | – | – | – | – | 0.960 | 0.789 | 2.07 | 0.00002 | 76 | 0.00 | 0.50 (+0.01) | 0.61 (+0.08) | 0.0014 | dev_002_structure_all_retrieval |
 | dev_005_mmr_retrieval | experiments/005-k-mmr.md | chunking.method: recursive → structure, retrieval.mmr: False → True | 90 | – | – | – | – | 0.973 (+0.013) | 0.665 (-0.124) | 1.38 (-0.69) | 0.00002 | 76 | 0.00 | 0.49 (+0.00) | 0.65 (+0.12) | 0.0014 | dev_002_structure_all_retrieval |
+| dev_006_embedding001_retrieval | experiments/006-embedding.md | chunking.method: recursive → structure, embedding.model: gemini-embedding-2 → gemini-embedding-001, embedding.task_type: None → retrieval, embedding.text_format: gemini2_qa → none | 90 | – | – | – | – | 0.973 (+0.013) | 0.843 (+0.053) | 2.16 (+0.09) | 0.00001 (-0.00001) | 53 (-23) | 0.00 | 0.38 (-0.11) | 0.42 (-0.11) | 0.0007 | dev_002_structure_all_retrieval |
