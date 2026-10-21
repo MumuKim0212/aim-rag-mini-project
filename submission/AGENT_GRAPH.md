@@ -8,7 +8,7 @@ GUIDE: 제출물 "Agent 그래프 구조도". 각 노드의 역할, 노드 간 �
 
 # Agent 그래프 구조도
 
-상태: 구현 완료 (2026-10-21, `src/rag/agent.py`, LangGraph). 초안과 달라진 점은 6절
+상태: 구현 완료 (2026-10-21, `src/rag/agent.py`, LangGraph). 2026-10-22: 검색 노드가 T2와 같은 rerank를 거치고 답변 프롬프트는 설정을 따른다(최종 T3는 `answer_v4`). 아래 dev 결과(카드 008)는 이전 설정(v1, rerank 없음)의 값이다. 초안과 달라진 점은 6절
 
 ## 1. 설계 의도
 
@@ -53,7 +53,7 @@ graph TD;
 | 노드 | 역할 | LLM | 출력 |
 |---|---|---|---|
 | classify | 질문 유형 4가지 중 하나 (`prompts/agent_classify_v1.md`) | 1회 | 유형, 이유 |
-| retrieve | 기본 RAG와 같은 검색기(Hybrid, k=5). 결과를 누적 문맥에 더한다(중복 제거, 총 10개까지) | 0 (임베딩만) | 청크 목록 |
+| retrieve | 기본 RAG와 같은 검색(`BaselineRAG.retrieve`: Hybrid 후보 15개 → LLM rerank로 5개, 2026-10-22부터). 결과를 누적 문맥에 더한다(중복 제거, 총 10개까지) | 0 (임베딩만) | 청크 목록 |
 | grade | 누적 문맥으로 답할 수 있는지 판단 (`agent_grade_v1.md`). needs_info·inappropriate는 건너뜀 | 0–1회 | 충분 / 부족 + 부족한 점 |
 | rewrite | 부족한 점을 바탕으로 새 검색어 (`agent_rewrite_v1.md`), 최대 2회 | 0–1회 | 검색어 |
 | generate | 기본 RAG와 같은 답변 단계 (`answer_v1.md`): status, 답변, 인용 번호 | 1회 | status, answer, citations |

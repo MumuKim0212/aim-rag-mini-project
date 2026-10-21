@@ -96,7 +96,7 @@ class Agent(BaselineRAG):
 
     def _retrieve(self, s: State) -> dict:
         start = time.perf_counter()
-        found = self._retriever(s["scope"]).search(s["query"], s["steps"])
+        found = self.retrieve(s["query"], s["scope"], s["steps"])  # includes the rerank step when retrieval.rerank_pool is set
         if not s["searches"]:
             s["steps"]["first_context"] = found
         have = {u["chunk_id"] for u in s["units"]}
