@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 012: Answer prompt v4 on gemini-3.6-flash
 
-Status: running
+Status: decided by the criteria (v2 stays for 3.6 flash; v4 is higher by point estimate, adoption is the owner's call)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -33,3 +33,26 @@ Date: 2026-10-21
 
 - Answers 90 + judge 90 (about 0.5 USD).
 - Calls so far in the project: 3,361 (submission/PROCESS.md ledger, 2026-10-21)
+
+## 5. Results
+
+Run `dev_012_flash36_v4` (2026-10-21, dev 90, 0 errors; 90 answers + 90 judge).
+
+| | 3.6 flash + v2 | 3.6 flash + v4 | lite + v4 |
+|---|---|---|---|
+| Answer score | 0.861 | **0.883** | 0.856 |
+| Fully correct | 69 | 72 | 67 |
+| Status match / citation on gold page | 96.7% / 96.0% | 96.7% / 97.3% | 95.6% / 93.2% |
+| Answer USD / question | 0.00329 | 0.00404 (1.23×) | 0.00164 |
+| p90 latency | 4.3 s | 5.3 s | 3.7 s |
+
+- Paired v4 vs v2 (3.6 flash): better 7 (ADD-PF01 NEG011 NEG037 POS074 POS076 POS078 POS079), worse 4 (ADD-HF06 ADD-IN08 ADD-RP06 POS061), 79 same; diff +0.022, CI [−0.017, +0.061], net +3. Against lite + v4: better 9 (ADD-HF10 ADD-HP10 ADD-IN01 NEG013 POS022 POS057 POS076 POS078 POS079), worse 5 (ADD-HF06 ADD-RP06 ADD-SE06 POS061 POS070); diff +0.028, CI [−0.017, +0.072].
+
+## 6. Answer run
+See section 5.
+
+## 7. Decision and notes
+
+- By the criteria: net +3 (needs 5) and p90 5.3 s (cap 5 s) → v4 does not replace v2 for 3.6 flash. Both gains are inside the noise (CI includes 0).
+- As expected the point estimate is the highest of all dev runs (0.883), and 3.6 flash is above lite with the same prompt (+0.028, not distinguishable). v4 was written from dev answers, so the number is optimistic; it costs 1.23× the answer money and 1 s of p90.
+- Choices for T2 (owner): (a) 3.6 flash + v2 (0.861, current), (b) 3.6 flash + v4 (0.883, highest, 0.0040 USD/question), (c) lite + v4 (0.856, 0.0016 USD/question). Not switched; PROCESS.md §9 is unchanged.
