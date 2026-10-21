@@ -280,6 +280,8 @@ COLUMNS = [  # (header, path in summary, format, higher_is_better)
     ("page_hit@5", "retrieval.page_hit@5", "{:.3f}", True),
     ("evid@5", "retrieval.evid@5", "{:.3f}", True),
     ("gold@5", "retrieval.gold@5", "{:.2f}", True),
+    ("문맥 evid", "retrieval.evid", "{:.3f}", True),   # what the answer step received; equals evid@5 only when k=5
+    ("문맥 글자", "retrieval.chars", "{:.0f}", False),
     ("USD/문항", "cost.usd_per_question", "{:.5f}", False),
     ("토큰/문항", "cost.tokens_per_question", "{:.0f}", False),
     ("LLM 호출/문항", "calls.llm_per_question", "{:.2f}", False),
