@@ -56,7 +56,20 @@ Runs `dev_004_bm25_retrieval`, `dev_004_hybrid_retrieval` (2026-10-21, 74 dev qu
 
 ## 6. Answer run (only if allowed)
 
-_filled below after the chain answer run_
+Chain answer run `dev_004_hybrid` (hybrid α 0.5, the owner-adopted chain), dev 90, 0 errors, 2026-10-21; it is also the baseline answer run for cards 005, 007 and 008. Calls: 90 answers + 90 judge (about 0.23 USD).
+
+| | Vector chain `dev_002b_structure900` | Hybrid chain `dev_004_hybrid` | Original baseline `dev_000_baseline` |
+|---|---|---|---|
+| Answer score (0–1) | 0.756 | **0.772** | 0.722 |
+| Paired vs the vector chain | – | 13 better / 9 worse / 68 same, diff +0.017, CI [−0.044, +0.078], net +4 | – |
+| Paired vs the original baseline | – | 17 / 9 / 64, diff +0.050, CI [−0.028, +0.128], net +8 | – |
+| Tokens / question | 2,622 | 2,813 (1.07×) | 2,916 |
+| USD / question (answer) | 0.00107 | 0.00115 | 0.00116 |
+| p90 latency | 1.88 s | 3.51 s (see below) | 2.07 s |
+| Garbled outputs | 0 | 1 (NEG008, abstained) | – |
+
+- Hybrid better than the vector chain: ADD-HF07 ADD-PF09 ADD-RP01 ADD-RP05 ADD-RP07 ADD-SE03 NEG009 NEG022 POS022 POS037 POS045 POS054 POS057; worse: ADD-HF06 ADD-HP06 ADD-HP10 ADD-IN01 ADD-IN08 NEG039 POS017 POS052 POS061. Net +4 is inside the noise (14 changed questions in a rerun): the answer-level effect of hybrid is not distinguishable from zero.
+- Latency: the four slowest runs in run order are the first four questions (3.5–4.2 s) and a few more above 3 s early on: the BM25 index of each scope is tokenized (Kiwi) on first use and that time is counted in the question's latency. Without the first 12 questions in run order the p50 is 1.72 s and the p90 2.19 s (vector chain 1.58 s / 2.07 s overall). The run's p90 of 3.51 s exceeds the 3.0 s cap used in earlier cards; the steady-state figure is 2.19 s. The harness was not changed to exclude warm-up.
 
 ## 7. Decision and notes
 
