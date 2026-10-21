@@ -13,6 +13,22 @@ corpus:
   pages: corpus/pages.jsonl     # committed page extraction; everyone chunks the same text
   exclude_pages:                # file -> [first, last] pages (1-based) not indexed
     financial_glossary_readable.pdf: [20, 25]   # URL source list, not content
+    # standard terms: each PDF ends with a "출처 목록" (article title + URL per line), starting on its own page
+    01_매매거래계좌설정약관.pdf: [7, 8]
+    02_파생상품계좌설정약관.pdf: [12, 13]
+    03_외화증권매매거래계좌설정약관.pdf: [7, 7]
+    04_신용거래약관.pdf: [7, 7]
+    05_증권대차거래약관.pdf: [8, 8]
+    06_연금저축계좌설정약관.pdf: [11, 12]
+    07_대고객환매조건부매매약관.pdf: [5, 5]
+    08_기관간환매조건부매매약관.pdf: [11, 11]
+    09_기업어음증권거래약관.pdf: [4, 4]
+    10_전자금융거래 이용에 관한 기본약관.pdf: [7, 7]
+    11_외국집합투자증권 매매거래에 관한 표준약관.pdf: [6, 7]
+    12_수익증권저축약관.pdf: [7, 8]
+    13_해외파생상품시장거래중개계좌설정약관.pdf: [6, 6]
+    14_해외파생상품시장거래총괄계좌설정약관.pdf: [7, 8]
+    15_유사해외통화선물(FX Margin Trading) 거래약관.pdf: [6, 6]
   scopes:                       # file patterns, relative to pdf_dir
     A: [financial_glossary_readable.pdf, "standard_terms/*.pdf"]
     B: ["*.pdf", "*/*.pdf"]
