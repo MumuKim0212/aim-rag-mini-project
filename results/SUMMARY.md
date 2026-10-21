@@ -1,6 +1,6 @@
 # 실험 결과 요약
 
-생성: 2026-10-21T13:39:26 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
+생성: 2026-10-21T14:22:57 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
 
 | 실험 | 카드 | 변경 | n | 정답 점수 | 완전 정답 | 대응 일치 | 인용 정확 | page_hit@5 | evid@5 | gold@5 | USD/문항 | 토큰/문항 | LLM 호출/문항 | p50 s | p90 s | 비용 USD | 기준 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -30,3 +30,4 @@
 | dev_007_flash38 | experiments/007-answer-model.md | answer.model: gemini-3.5-flash-lite → gemini-3.8-flash, chunking.chunk_overlap: 100 → 112, chunking.chunk_size: 800 → 900, chunking.max_chars: None → 1600, chunking.method: recursive → structure, retrieval.method: vector → hybrid | 90 | 0.850 (+0.078) | 73.3% (+11.1%) | 95.6% (+7.8%) | 96.0% (+5.4%) | 0.987 | 0.853 | 2.11 | 0.00265 (+0.00150) | 2855 (+41) | 1.00 | 3.88 (+2.20) | 5.40 (+1.90) | 0.2384 | dev_004_hybrid |
 | dev_007_lite31 | experiments/007-answer-model.md | answer.model: gemini-3.5-flash-lite → gemini-3.1-flash-lite, chunking.chunk_overlap: 100 → 112, chunking.chunk_size: 800 → 900, chunking.max_chars: None → 1600, chunking.method: recursive → structure, retrieval.method: vector → hybrid | 90 | 0.833 (+0.061) | 70.0% (+7.8%) | 93.3% (+5.5%) | 94.6% (+4.0%) | 0.987 | 0.853 | 2.11 | 0.00164 (+0.00049) | 3323 (+510) | 1.00 | 2.68 (+1.00) | 5.53 (+2.03) | 0.1477 | dev_004_hybrid |
 | dev_008_agent | experiments/008-agent.md | agent.max_context: None → 10, answer.model: gemini-3.5-flash-lite → gemini-3.6-flash, chunking.chunk_overlap: 100 → 112, chunking.chunk_size: 800 → 900, chunking.max_chars: None → 1600, chunking.method: recursive → structure, retrieval.method: vector → hybrid, system: rag → agent | 90 | 0.856 (+0.033) | 74.4% (+3.3%) | 96.7% (+2.2%) | 96.0% (+2.7%) | 0.987 | 0.853 | 2.11 | 0.00506 (+0.00245) | 5818 (+2976) | 3.16 (+2.16) | 5.52 (+2.87) | 9.12 (+4.97) | 0.4556 | dev_007_flash36 |
+| dev_010_answerv2 | experiments/010-answer-prompt-v2.md | answer.model: gemini-3.5-flash-lite → gemini-3.6-flash, answer.prompt: prompts/answer_v1.md → prompts/answer_v2.md, chunking.chunk_overlap: 100 → 119, chunking.chunk_size: 800 → 950, chunking.max_chars: None → 1600, chunking.method: recursive → structure, retrieval.method: vector → hybrid | 90 | 0.861 (+0.017) | 76.7% (+2.2%) | 96.7% (+2.2%) | 96.0% (+1.4%) | 0.973 | 0.861 | 2.15 | 0.00329 (+0.00064) | 3376 (+494) | 1.00 | 3.11 (+0.50) | 4.34 (+0.83) | 0.2964 | dev_001e_chunk950chain |
