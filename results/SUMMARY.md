@@ -1,6 +1,6 @@
 # 실험 결과 요약
 
-생성: 2026-10-21T16:16:25 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
+생성: 2026-10-21T16:35:34 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
 
 | 실험 | 카드 | 변경 | n | 정답 점수 | 완전 정답 | 대응 일치 | 인용 정확 | page_hit@5 | evid@5 | gold@5 | 문맥 evid | 문맥 글자 | USD/문항 | 토큰/문항 | LLM 호출/문항 | p50 s | p90 s | 비용 USD | 기준 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -30,3 +30,5 @@
 | dev_007_lite31_r2 | experiments/007-answer-model.md | answer.model: gemini-3.5-flash-lite → gemini-3.1-flash-lite, chunking.method: recursive → structure | 90 | 0.789 (+0.028) | 65.6% (+4.4%) | 94.4% (+3.3%) | 93.2% (+1.3%) | 0.960 | 0.789 | 2.07 | 0.789 | 2331 | 0.00128 (+0.00028) | 2723 (+345) | 1.00 | 2.31 (+0.56) | 4.88 (+0.43) | 0.1148 | dev_002_structure_all |
 | dev_010_struct1000 | experiments/010-chunking-combo.md | chunking.chunk_overlap: 100 → 125, chunking.chunk_size: 800 → 1000, chunking.method: recursive → structure | 90 | 0.756 | 61.1% | 91.1% | 90.5% | 0.987 (+0.027) | 0.805 (+0.016) | 2.16 (+0.09) | 0.805 (+0.016) | 2683 (+352) | 0.00107 (+0.00105) | 2602 (+2526) | 1.00 (+1.00) | 1.77 (+1.28) | 3.05 (+2.52) | 0.0962 | dev_002_structure_all_retrieval |
 | dev_010_struct1000_retrieval | experiments/010-chunking-combo.md | chunking.chunk_overlap: 100 → 125, chunking.chunk_size: 800 → 1000, chunking.method: recursive → structure | 90 | – | – | – | – | 0.987 (+0.027) | 0.805 (+0.016) | 2.16 (+0.09) | 0.805 (+0.016) | 2683 (+352) | 0.00002 | 76 (+0) | 0.00 | 0.48 (-0.00) | 0.55 (+0.02) | 0.0014 | dev_002_structure_all_retrieval |
+| dev_011_lite31_prompt2 | experiments/011-answer-prompt-v2.md | answer.model: gemini-3.5-flash-lite → gemini-3.1-flash-lite, answer.prompt: prompts/answer_v1.md → prompts/answer_v2.md, chunking.method: recursive → structure | 90 | 0.850 (+0.050) | 74.4% (+6.7%) | 94.4% | 93.2% | 0.960 | 0.789 | 2.07 | 0.789 | 2331 | 0.00158 (+0.00030) | 3100 (+377) | 1.00 | 2.73 (+0.39) | 5.54 (+0.64) | 0.1417 | dev_007_lite31 |
+| dev_011_lite31_prompt2_r2 | experiments/011-answer-prompt-v2.md | answer.model: gemini-3.5-flash-lite → gemini-3.1-flash-lite, answer.prompt: prompts/answer_v1.md → prompts/answer_v2.md, chunking.method: recursive → structure | 90 | 0.844 (+0.044) | 72.2% (+4.4%) | 94.4% | 93.2% | 0.960 | 0.789 | 2.07 | 0.789 | 2331 | 0.00158 (+0.00030) | 3100 (+377) | 1.00 | 2.54 (+0.20) | 5.10 (+0.19) | 0.1417 | dev_007_lite31 |
