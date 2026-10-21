@@ -1,0 +1,6 @@
+base: baseline.yaml
+name: 002_structure
+card: experiments/002-structure.md
+description: Structure chunking (glossary term, terms article; other documents Recursive 800/100), vector k=5
+chunking:
+  method: structure

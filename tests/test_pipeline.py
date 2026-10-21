@@ -147,3 +147,44 @@ def test_embedding_text_format(cfg):
     assert retrieval.query_text("휴면성?", cfg) == "task: question answering | query: 휴면성?"
     cfg["embedding"]["text_format"] = "none"
     assert retrieval.document_text(chunk, cfg) == "제1조" and retrieval.query_text("q", cfg) == "q"
+
+
+def _terms_pages():
+    return [{"file": "t.pdf", "path": "standard_terms/t.pdf", "page": 1, "text": "1\n약관 제목\n제1조(목적)\n이 약관은 목적을 정한다.\n제2조(정의)\n① 첫째 항이다.\n"},
+            {"file": "t.pdf", "path": "standard_terms/t.pdf", "page": 2, "text": "2\n② 둘째 항은 다음 쪽에 이어진다.\n제3조(통지)\n통지는 서면으로 한다. 제2조(정의)에 따른다.\n"}]
+
+
+def test_structure_chunks_terms_by_article(cfg):
+    cfg["chunking"]["method"] = "structure"
+    chunks = chunking.chunk_pages(_terms_pages(), cfg)
+    assert [c["content"].split("\n")[0] for c in chunks] == ["약관 제목", "제1조(목적)", "제2조(정의)", "제3조(통지)"]
+    article2 = chunks[2]
+    assert article2["pages"] == [1, 2] and article2["page"] == 1 and "다음 쪽에 이어진다" in article2["content"]
+    assert not any(c["content"].startswith(("1\n", "2\n")) for c in chunks)         # page-number lines are dropped
+    assert chunks[3]["content"].endswith("에 따른다.")                                 # a mid-line citation does not start an article
+
+
+def test_structure_splits_long_article_per_page_and_keeps_other_documents(cfg):
+    cfg["chunking"].update(method="structure", chunk_size=40, chunk_overlap=5)
+    long_article = {"file": "t.pdf", "path": "standard_terms/t.pdf", "page": 1,
+                    "text": "1\n제1조(길다)\n" + "가나다라마바사 " * 12}
+    guide = {"file": "g.pdf", "path": "g.pdf", "page": 1, "text": "1\n" + "제1조(본문 아님) " * 8}
+    chunks = chunking.chunk_pages([long_article, guide], cfg)
+    in_terms = [c for c in chunks if c["source"] == "t.pdf"]
+    assert len(in_terms) > 1 and all(len(c["content"]) <= 40 and c["page"] == 1 for c in in_terms)
+    assert [c["content"] for c in chunks if c["source"] == "g.pdf"] == [
+        c["content"] for c in chunking.recursive([guide], cfg)]                       # not terms / glossary: baseline behaviour
+    assert len({c["chunk_id"] for c in chunks}) == len(chunks)
+
+
+def test_structure_glossary_one_chunk_per_term(cfg):
+    pdf = chunking.ROOT / "01_data" / "financial_glossary_readable.pdf"
+    if not pdf.exists():
+        pytest.skip("provided PDFs not present")
+    cfg["chunking"]["method"] = "structure"
+    page = {"file": "financial_glossary_readable.pdf", "path": "financial_glossary_readable.pdf", "page": 1, "text": ""}
+    chunks = chunking.chunk_pages([page], cfg)
+    assert chunks[0]["content"].splitlines()[0] == "휴면성 증권계좌" and "10만원 이하인 계좌" in chunks[0]["content"]
+    assert "금융용어 모음" not in " ".join(c["content"] for c in chunks)
+    wrapped = [c for c in chunks if c["content"].startswith("후불교통카드 겸용 체크카드")]
+    assert len(wrapped) == 1 and "사용할 수 있음" in wrapped[0]["content"]             # a definition wrapping over lines stays whole
