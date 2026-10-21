@@ -1,0 +1,7 @@
+base: 004-hybrid.yaml
+name: 005_k8
+card: experiments/005-retrieval-k.md
+compare_to: dev_004_hybrid
+description: "Adopted chain (structure + 900/112 + hybrid); k=8 instead of 5"
+retrieval:
+  k: 8
