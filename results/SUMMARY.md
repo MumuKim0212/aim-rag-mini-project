@@ -1,6 +1,6 @@
 # 실험 결과 요약
 
-생성: 2026-10-21T14:36:24 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
+생성: 2026-10-21T14:39:14 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
 
 | 실험 | 카드 | 변경 | n | 정답 점수 | 완전 정답 | 대응 일치 | 인용 정확 | page_hit@5 | evid@5 | gold@5 | USD/문항 | 토큰/문항 | LLM 호출/문항 | p50 s | p90 s | 비용 USD | 기준 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -19,3 +19,6 @@
 | dev_003_header_retrieval | experiments/003-header.md | chunking.add_header: False → True, chunking.method: recursive → structure | 50 | – | – | – | – | 0.971 (-0.029) | 0.921 (-0.029) | 1.82 (-0.06) | 0.00001 (-0.00082) | 61 (-1869) | 0.00 (-1.00) | 0.49 (-1.14) | 0.56 (-1.67) | 0.0006 | dev_002_structure |
 | dev_004_bm25_retrieval | experiments/004-retrieval-method.md | chunking.method: recursive → structure, retrieval.method: vector → bm25 | 90 | – | – | – | – | 0.892 (-0.068) | 0.714 (-0.075) | 1.66 (-0.41) | 0.00000 (-0.00002) | 0 (-76) | 0.00 | 0.02 (-0.47) | 0.10 (-0.43) | 0.0000 | dev_002_structure_all_retrieval |
 | dev_004_hybrid_retrieval | experiments/004-retrieval-method.md | chunking.method: recursive → structure, retrieval.method: vector → hybrid | 90 | – | – | – | – | 0.973 (+0.013) | 0.804 (+0.015) | 1.97 (-0.09) | 0.00002 | 76 | 0.00 | 0.49 (+0.01) | 1.49 (+0.96) | 0.0014 | dev_002_structure_all_retrieval |
+| dev_005_k3_retrieval | experiments/005-k-mmr.md | chunking.method: recursive → structure, retrieval.k: 5 → 3 | 90 | – | – | – | – | 0.932 (-0.027) | 0.718 (-0.071) | 1.61 (-0.46) | 0.00002 | 76 | 0.00 | 0.50 (+0.02) | 0.63 (+0.10) | 0.0014 | dev_002_structure_all_retrieval |
+| dev_005_k8_retrieval | experiments/005-k-mmr.md | chunking.method: recursive → structure, retrieval.k: 5 → 8 | 90 | – | – | – | – | 0.960 | 0.789 | 2.07 | 0.00002 | 76 | 0.00 | 0.50 (+0.01) | 0.61 (+0.08) | 0.0014 | dev_002_structure_all_retrieval |
+| dev_005_mmr_retrieval | experiments/005-k-mmr.md | chunking.method: recursive → structure, retrieval.mmr: False → True | 90 | – | – | – | – | 0.973 (+0.013) | 0.665 (-0.124) | 1.38 (-0.69) | 0.00002 | 76 | 0.00 | 0.49 (+0.00) | 0.65 (+0.12) | 0.0014 | dev_002_structure_all_retrieval |

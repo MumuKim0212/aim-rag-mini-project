@@ -1,0 +1,7 @@
+base: 002-structure.yaml
+name: 005_k8
+card: experiments/005-k-mmr.md
+description: Structure chunking (card 002) with vector search, k=8
+compare_to: dev_002_structure_all_retrieval
+retrieval:
+  k: 8
