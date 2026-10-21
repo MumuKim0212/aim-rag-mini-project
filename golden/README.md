@@ -56,7 +56,7 @@ Files (read by `src/rag/golden.py`; both are frozen once a run has used them —
 | File | Contents | Split |
 |---|---|---|
 | `provided.jsonl` | 180 provided questions converted to the format below | dev 90 / test 90, stratified by set × difficulty (× category for negatives); seed recorded in `review_log.md` |
-| `self.jsonl` | Self-written set (submission/PLAN.md §2.3) | all `test`, evaluated only at workflow step 8 |
+| `self.jsonl` | Self-written set (submission/PLAN.md §2.3), draft of 20 questions written 2026-10-22 (15 answerable, 5 not; `evidence_reviewed: false` until a human checks it; see `review_log.md`) | all `test`, evaluated only at workflow step 8 |
 | `review_log.md` | Every fix to a question, reference answer, or page, with the reason; split seed | – |
 
 Fields used in this project, on top of the general format above:
