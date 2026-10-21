@@ -6,8 +6,9 @@ not: escapes cost several tokens per character. Normal answers use 0.6-1.0 outpu
 
     python scripts/garble_scan.py dev_000_baseline dev_000_baseline_r2 [more experiments]
 
-Flags a run when the answer contains kana or the generate calls' output tokens exceed 2 per visible answer
-character. Report the count next to every answer-run result (decision 2026-10-21: PROCESS.md 6절).
+Flags a run when the answer contains kana or the generate calls' output tokens (thinking tokens excluded: a
+model that thinks, like gemini-3.1-flash-lite, would otherwise be flagged for every short answer) exceed 2 per
+visible answer character. Report the count next to every answer-run result (decision 2026-10-21: PROCESS.md 6절).
 """
 
 import re
@@ -29,7 +30,8 @@ def main():
         flagged = []
         for r in runs:
             body = (r["answer"] or "").split("\n\n출처:")[0]
-            tokens = sum(c["output_tokens"] for c in r["steps"]["calls"]
+            # output_tokens includes thinking tokens; escapes are written output, so thinking is subtracted
+            tokens = sum(c["output_tokens"] - c.get("thinking_tokens", 0) for c in r["steps"]["calls"]
                          if c.get("kind") == "llm" and c["node"] == "generate")
             if KANA.search(body) or (body and tokens / len(body) > TOKENS_PER_CHAR):
                 flagged.append((r["qid"], len(body), tokens, r["status"]))
