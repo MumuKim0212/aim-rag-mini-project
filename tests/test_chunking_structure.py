@@ -103,3 +103,11 @@ def test_answer_step_shows_every_page_of_a_unit():
     item = {"targets": [{"file": "a.pdf", "page": 4}]}
     assert citation_check(item, {"citations": citations[1:], "context": [two]})["on_target"] == 1
     assert citation_check(item, {"citations": citations[:1], "context": [one]})["on_target"] == 0
+
+
+def test_bm25_tokens_and_fusion():
+    from rag import retrieval
+    assert retrieval.tokenize("휴면성 증권계좌는 어떤 계좌인가요?") == retrieval.tokenize("휴면성 증권계좌 어떤 계좌")  # particles dropped
+    # vector pool a=1.0,b=0.0 after scaling; bm25 pool b=1.0,c=0.0 -> a 0.5, b 0.5 (tie broken by id), c 0
+    assert retrieval.fuse({"a": 0.9, "b": 0.5}, {"b": 10.0, "c": 5.0}, alpha=0.5) == [("a", 0.5), ("b", 0.5), ("c", 0.0)]
+    assert retrieval.fuse({"a": 0.9, "b": 0.5}, {"b": 10.0, "c": 5.0}, alpha=1.0)[0] == ("a", 1.0)

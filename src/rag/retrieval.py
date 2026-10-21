@@ -135,14 +135,14 @@ class VectorRetriever:
         self.collection = _collection(self.dir)
         self._lock = threading.Lock()
 
-    def search(self, query: str, steps: dict | None = None) -> list[dict]:
+    def search(self, query: str, steps: dict | None = None, k: int | None = None) -> list[dict]:
         steps = steps if steps is not None else {}
         start = time.perf_counter()
         text = query_text(query, self.cfg)
         [vector] = llm.embed([text], embedding_cfg=self.cfg["embedding"], purpose="query", steps=steps,
                              node="query_embed", tokens=round(len(text) * self.tokens_per_char), estimated=True)
         with self._lock:
-            hits = self.collection.query(query_embeddings=[vector], n_results=self.cfg["retrieval"]["k"],
+            hits = self.collection.query(query_embeddings=[vector], n_results=k or self.cfg["retrieval"]["k"],
                                          include=["distances"])
         units = [{**self.chunks[cid], "score": round(1 - dist, 4)}
                  for cid, dist in zip(hits["ids"][0], hits["distances"][0])]
@@ -150,13 +150,69 @@ class VectorRetriever:
         return units
 
 
+KEEP_TAGS = ("N", "VV", "VA", "XR", "SL", "SN", "SH")  # Kiwi tags: nouns, verbs/adjectives, roots, foreign/number/hanja
+FUSE_POOL = 50                                           # candidates taken from each ranking before fusion
+_kiwi, _kiwi_lock = None, threading.Lock()
+
+
+def tokenize(text: str) -> list[str]:
+    """Content morphemes only (no particles/endings), lower-cased; Korean needs this for BM25 to match
+    "휴면성 증권계좌는" with "휴면성 증권계좌"."""
+    global _kiwi
+    with _kiwi_lock:
+        if _kiwi is None:
+            from kiwipiepy import Kiwi
+            _kiwi = Kiwi()
+        return [t.form.lower() for t in _kiwi.tokenize(text) if t.tag.startswith(KEEP_TAGS)]
+
+
+def fuse(vector: dict, bm25: dict, alpha: float) -> list[tuple[str, float]]:
+    """{chunk_id: score} x2 -> [(chunk_id, alpha*norm(vector) + (1-alpha)*norm(bm25))], best first.
+    Each score set is min-max scaled over its own pool; a chunk missing from one pool gets 0 there."""
+    def norm(scores):
+        lo, hi = min(scores.values(), default=0.0), max(scores.values(), default=0.0)
+        return {c: (v - lo) / (hi - lo) if hi > lo else 0.0 for c, v in scores.items()}
+    v, b = norm(vector), norm(bm25)
+    fused = {c: alpha * v.get(c, 0.0) + (1 - alpha) * b.get(c, 0.0) for c in v.keys() | b.keys()}
+    return sorted(fused.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
 @register("bm25")
 class BM25Retriever:
+    """BM25 (rank_bm25 Okapi) over the chunk text of the scope's index; no embedding call. The title prefix
+    that the vector side embeds is not part of the BM25 text."""
+
     def __init__(self, cfg: dict, scope: str):
-        raise NotImplementedError("card 004")
+        from rank_bm25 import BM25Okapi
+        if cfg["retrieval"].get("bm25_tokenizer") != "kiwi":
+            raise KeyError(f"unknown retrieval.bm25_tokenizer {cfg['retrieval'].get('bm25_tokenizer')!r}")
+        self.cfg, path = cfg, index_dir(cfg, scope) / "chunks.jsonl"
+        if not path.exists():
+            raise FileNotFoundError(f"no index for scope {scope} ({path.parent}); run scripts/build_index.py first")
+        with path.open(encoding="utf-8") as f:
+            self.chunks = [json.loads(line) for line in f]
+        self.bm25 = BM25Okapi([tokenize(c["content"]) for c in self.chunks])
+
+    def search(self, query: str, steps: dict | None = None, k: int | None = None) -> list[dict]:
+        steps = steps if steps is not None else {}
+        start = time.perf_counter()
+        scores = self.bm25.get_scores(tokenize(query))
+        order = sorted(range(len(scores)), key=lambda i: (-scores[i], i))[:k or self.cfg["retrieval"]["k"]]
+        steps.setdefault("search_seconds", []).append(round(time.perf_counter() - start, 3))
+        return [{**self.chunks[i], "score": round(float(scores[i]), 4)} for i in order]
 
 
 @register("hybrid")
 class HybridRetriever:
+    """Vector and BM25 rankings (top FUSE_POOL each) fused with retrieval.hybrid_alpha (weight of vector)."""
+
     def __init__(self, cfg: dict, scope: str):
-        raise NotImplementedError("card 004")
+        self.cfg, self.alpha = cfg, cfg["retrieval"]["hybrid_alpha"]
+        self.vector, self.bm25 = VectorRetriever(cfg, scope), BM25Retriever(cfg, scope)
+
+    def search(self, query: str, steps: dict | None = None) -> list[dict]:
+        steps = steps if steps is not None else {}
+        v = {u["chunk_id"]: u for u in self.vector.search(query, steps, k=FUSE_POOL)}
+        b = {u["chunk_id"]: u for u in self.bm25.search(query, steps, k=FUSE_POOL)}
+        fused = fuse({c: u["score"] for c, u in v.items()}, {c: u["score"] for c, u in b.items()}, self.alpha)
+        return [{**(v.get(c) or b[c]), "score": round(score, 4)} for c, score in fused[:self.cfg["retrieval"]["k"]]]

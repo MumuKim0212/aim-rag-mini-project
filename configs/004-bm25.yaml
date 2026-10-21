@@ -1,0 +1,7 @@
+base: 002b-structure-900.yaml
+name: 004_bm25
+card: experiments/004-retrieval-method.md
+compare_to: dev_002b_structure900
+description: Adopted chain (structure + 900/112); BM25 (Kiwi content morphemes) instead of vector search
+retrieval:
+  method: bm25
