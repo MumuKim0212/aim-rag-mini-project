@@ -40,3 +40,11 @@ Date: 2026-10-21
 
 - Answers 90 + judge 90 per version; up to 3 versions (L1, L2, L3), about 0.15–0.35 USD each.
 - Calls so far in the project: 2,820 (submission/PROCESS.md ledger, 2026-10-21)
+
+## 5. Results
+
+### L1 `dev_011_lite_v2` (lite + prompt v2; dev 90, 0 errors, answer 0.123 USD)
+
+- Score **0.822** (fully correct 64 of 90, status match 93.3%, citation on gold page 94.6%) against 0.861 / 69 for 3.6-flash (`dev_010_answerv2`). Paired: lite better 5 (NEG011 NEG037 POS070 POS074 POS078), 3.6-flash better 9 (ADD-HF10 ADD-HP10 ADD-IN08 NEG013 NEG039 POS044 POS047 POS054 POS061), 76 same; diff −0.039, CI [−0.089, +0.011]. Answer cost 0.42×, p90 latency 3.0 s.
+- Lite's 26 imperfect answers (read in full): (1) one dense paragraph that leaves out a part of the question or the evidence's conditions (POS047 POS054 POS059 POS061 POS066 POS076 ADD-HP09 ADD-HP10 ADD-HF10 ADD-IN04 ADD-PF01 ADD-PF08); (2) abstains or clarifies although part of the evidence is in context (POS044 ADD-IN08 ADD-SE06); (3) answers instead of asking for an unspecified account (NEG013 NEG014); (4) adds figures that are not in the results (POS050 "T+2", POS061 "50%"); (5) planned dates / proposals read as in force (NEG037 ADD-HF06).
+- `answer_v3.md` was written from these (frozen before its run, see the file header).
