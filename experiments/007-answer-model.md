@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 007: Answer model — gemini-3.1-flash-lite and gemini-3.8-flash vs gemini-3.5-flash-lite (H5)
 
-Status: planned
+Status: decided (gemini-3.8-flash meets the written adoption conditions; its latency check fails and is flagged to the owner)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -41,10 +41,30 @@ Date: 2026-10-21
 
 ## 5. Results
 
-_..._
+Runs `dev_007_lite31`, `dev_007_flash38` (2026-10-21, dev 90, 0 errors). Reused: `dev_004_hybrid`.
+
+| | 3.5-flash-lite (chain) | 3.1-flash-lite | 3.8-flash |
+|---|---|---|---|
+| Answer score (0–1) | 0.772 | 0.833 | **0.850** |
+| Paired vs chain (better / worse / same) | – | 14 / 4 / 72, diff +0.061, CI [+0.011, +0.111], net +10, 18 changed | 14 / 1 / 75, diff +0.078, CI [+0.033, +0.122], net +13, 15 changed |
+| Status match / citation on a gold page | 87.8% / 90.5% | 93.3% / 94.6% | 95.6% / 95.9% |
+| Score by difficulty (basic / intermediate / advanced / adversarial) | 0.816 / 0.885 / 0.569 / 1.0 | 0.947 / 0.885 / 0.672 / 1.0 | 0.895 / 0.910 / 0.724 / 1.0 |
+| Score by set (base_pos / base_neg / life_guide / additional) | 0.867 / 0.825 / 0.650 / 0.683 | 0.883 / 0.825 / 0.800 / 0.800 | 0.917 / 0.875 / 0.700 / 0.817 |
+| USD / question (answer) | 0.00115 | 0.00164 (**1.43×**) | 0.00265 (2.31×) |
+| Tokens / question | 2,813 | 3,323 | 2,855 |
+| Thinking tokens (90 answers) | 0 | 43,215 | 0 |
+| p50 / p90 latency | 1.69 s / 3.51 s (2.19 s without the first 12) | 2.68 s / 5.53 s | 3.88 s / 5.40 s (5.21 s without the first 12) |
+| Garbled outputs (kana in the answer) | 0 | 0 | 0 |
+
+- 3.1-flash-lite better: ADD-HF06 ADD-HF10 ADD-HP06 ADD-HP10 ADD-IN01 ADD-RP06 ADD-SE06 NEG023 NEG039 POS017 POS058 POS061 POS064 POS078; worse: ADD-PF06 NEG011 NEG022 POS045.
+- 3.8-flash better: ADD-HF06 ADD-HP06 ADD-HP10 ADD-IN01 ADD-IN08 ADD-RP06 ADD-SE08 NEG023 NEG025 NEG039 POS052 POS054 POS058 POS064; worse: NEG022.
+- `scripts/garble_scan.py` flags 41 of 90 `dev_007_lite31` runs because it compares output tokens with answer characters and 3.1-flash-lite spends thinking tokens at `thinking_level: low`. Checking the answers directly for kana (the failure seen in POS054) finds none in any of the three runs. The scan is not valid for models that think. 3.8-flash and 3.5-flash-lite show no thinking tokens.
+- Cost: answers 0.148 USD (3.1-lite) and 0.238 USD (3.8-flash); judge about 0.12 USD each.
+- By the rules of section 3: **3.8-flash**: net +13 ≥ 9, 15 changed > 14, CI excludes 0, USD 2.31× ≤ 4× → meets the adoption conditions. **3.1-flash-lite**: not cheaper — with its thinking tokens it costs 1.43× the chain, against the required ≤ 0.9× → not adopted as the cheap option, although its score gain (+0.061, CI excludes 0) is also real. **Latency check**: 3.8-flash has p90 5.2 s without warm-up (cap 3.0 s) and p50 3.9 s; the check is not met.
 
 ## 6. Decision and notes
 
-- Decision: _..._
-- Why, with question IDs: _..._
-- What the criteria missed, if anything: _..._
+- Decision: **gemini-3.8-flash is adopted as the answer model** under the written conditions (score, CI, cost). The latency check is **not** met (p90 5.2 s vs 3.0 s); section 3 words it as "checked", not as a blocking condition, so the rule alone does not reject it. This is flagged for the project owner, who may revert to `gemini-3.5-flash-lite` (0.772, p90 2.2 s) or choose differently.
+- Why, with question IDs: the gain over the chain is on advanced questions (0.569 → 0.724), over-abstention and negative handling (ADD-HF06 ADD-HP06 ADD-HP10 ADD-IN01 NEG023 NEG025 NEG039 improved; only NEG022 worse), and 3.8-flash does not use thinking tokens at `low`, so it is a model effect. H5 (small gap on basic, larger on advanced and negative) is partly supported: basic 0.816 → 0.895, advanced 0.569 → 0.724; `base_negative` 0.825 → 0.875.
+- Cost and time: +0.0015 USD per question (answer), +1.7–1.9 s median latency. Over 90 questions that is +0.14 USD.
+- What the criteria missed: the latency bullet was ambiguous (check or gate), the `scripts/garble_scan.py` heuristic fails for thinking models, and "cheaper" 3.1-flash-lite turned out dearer than 3.5-flash-lite because of thinking tokens. Nothing was changed after the results. The score of 3.8-flash vs 3.1-flash-lite (0.850 vs 0.833) was not compared directly and is not claimed.
