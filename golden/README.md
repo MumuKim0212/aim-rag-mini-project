@@ -71,4 +71,25 @@ Fields used in this project, on top of the general format above:
 | `targets` | `[{"file": <file name, NFC>, "page": <1-based>}]`, converted from `source_ids` and checked against the PDF (submission/PLAN.md §2.2) |
 | `evidence` | verbatim quotes from `corpus/pages.jsonl` text of the target pages; must auto-match |
 
-_Fill in when the set is built: counts per split / set / type, how many evidence quotes failed to match and why, known weaknesses._
+Extra fields written by `scripts/convert_golden.py`: `evidence_pages` (`{file, page, source}` per quote, source
+`text` = PDF text layer, `vlm` = VLM supplement in corpus/pages.jsonl), `evidence_source`, `source_kind`
+(glossary / terms / page), `context_type` (text / paragraph / table / chart), `evidence_reviewed`, `note`,
+plus `source_file` / `source_locator` for the additional set. `golden/evidence.jsonl` holds the hand-reviewed
+quotes (and `extra_targets`) the converter reads; edit that file, not provided.jsonl.
+
+**provided.jsonl, built 2026-10-20** (seed 20261020; details and every fix in `review_log.md`)
+
+| Set | dev | test | answerable (dev / test) |
+|---|---|---|---|
+| base_positive | 30 | 30 | 30 / 30 |
+| base_negative | 20 | 20 | 4 / 4 (correction cases with sources) |
+| life_guide | 10 | 10 | 10 / 10 |
+| additional | 30 (5 per document) | 30 (5 per document) | 30 / 30 |
+
+- Difficulty and `context_type` are balanced per split (life guide basic/intermediate off by one; odd strata).
+- 353 evidence quotes for 148 answerable items, all auto-matching; 19 items also use VLM quotes, checked against
+  the page images. 0 reference answers or questions changed.
+- `kofia-terms-X-V-A`: A is the article's position in the terms PDF's source list, not its article number (they
+  differ in 02_파생상품계좌설정약관, which has 제10조의2·3).
+- Known weaknesses: 34 questions assume a document context ("이 자료", "책에서"); POS079's table is split across two
+  pages and only text-layer fragments cover it; 71 items have several target pages (read `evid` next to `page_hit`).

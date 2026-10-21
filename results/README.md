@@ -21,6 +21,7 @@ One folder per experiment, `results/<experiment>/`, named `<split>_<config name>
 
 - `metrics.jsonl` — one row per question, no LLM: `qid`, `set`, `status`; for questions with gold pages the context metrics (`page_hit`, `gold`, `evid`, `evid_full`, `units`, `chars`) and ranked metrics (`mrr`, `page_hit@k`, `gold@k`, `evid@k`), plus `first_*` for agents; code checks `status_ok`, `behavior_group`, `citation_in_context`, `citation_on_target`; per-question `usd`, tokens, calls, `latency_s`; `correctness` copied from grades.
 - `grades.jsonl` — one row per graded run: `qid`, `run_id`, `correctness` (0/1/2), `reason`, judge flags, `calls`, `judge_model`, `judge_prompt`.
+- `grades__<suffix>.jsonl` — a regrade of the same runs (`grade.py --suffix`), copied from `out/grades/` when a decision uses it; `dev_000_baseline/grades__regrade1.jsonl` is noise (b), workflow step 3.
 - `runs.jsonl` — every logged run of the experiment (`RunLog.load`, errors and reruns included), one per line.
 
 ## summary.json

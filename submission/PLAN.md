@@ -39,7 +39,7 @@ GUIDE: 제출물 "RAG 실험 계획". 실험을 시작하기 전에 정한 목�
 
 | 세트 | 문항 | dev | test | 정답 근거 ID → (파일, 페이지) 변환 |
 |---|---|---|---|---|
-| 기본 positive | 60 | 30 | 30 | `fsc-glossary-N`: 용어집 출처 목록의 `dicId=N` → 용어 → 그 용어가 나오는 페이지. `kofia-terms-X-V-A`: 약관 1쪽의 `버전: V` → 파일, `A` → 제A조(추정, 1단계에서 검증) → 그 조항이 나오는 페이지 |
+| 기본 positive | 60 | 30 | 30 | `fsc-glossary-N`: 용어집 출처 목록의 `dicId=N` → 용어 → 그 용어가 나오는 페이지. `kofia-terms-X-V-A`: 약관 1쪽의 `버전: V` → 파일, `A` → 그 약관 출처 목록의 A번째 조(1단계에서 확인: 조 번호와 다를 수 있다. 02약관은 제10조의2·3 때문에 `…-014` = 제12조) → 그 조항이 나오는 페이지 |
 | 기본 negative | 40 | 20 | 20 | 8문항만 근거 ID가 있다(정정형). 나머지는 답변 불가 |
 | 금융생활 positive | 20 | 10 | 10 | `fss-life-guide-pdf-N` = PDF N쪽 |
 | 추가 positive | 60 | 30 | 30 | `<파일>-pdf-N` = PDF N쪽 |
@@ -70,7 +70,7 @@ GUIDE: 제출물 "RAG 실험 계획". 실험을 시작하기 전에 정한 목�
 
 | 요소 | 값 |
 |---|---|
-| 문서 처리 | PyMuPDF 페이지별 텍스트 추출, 용어집 출처 목록 페이지 제외 |
+| 문서 처리 | PyMuPDF 페이지별 텍스트 추출 + 범위 B(가이드·추가 자료) 페이지 이미지의 VLM 보충(`gemini-3.8-flash`, 표·차트·이미지 속 글자만, 텍스트 뒤에 덧붙임; `configs/extraction.yaml`). 용어집 출처 목록 페이지 제외. 결과 `corpus/pages.jsonl`은 고정 |
 | 청킹 | Recursive, 800자, 겹침 100자 |
 | 검색 | 벡터 검색(`gemini-embedding-2`, Chroma 코사인), k=5. 임베딩 텍스트는 모델 문서 권장 형식: 질문 `task: question answering \| query: …`, 청크 `title: <문서 제목> \| text: …` |
 | 답변 | [`prompts/answer_v1.md`](../prompts/answer_v1.md), LLM 1회. 근거로만 답하고 `status`(answered / abstained / clarify / refused)를 고른다. 전제 정정, 프롬프트 주입 무시 규칙을 포함한다. 인용은 검색 결과 번호로 받고 코드에서 파일·페이지로 바꾼다. Agent의 generate 노드도 같은 프롬프트를 쓴다(3.3절) |
