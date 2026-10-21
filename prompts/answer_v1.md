@@ -1,6 +1,6 @@
 <!--
 GUIDE: Answer prompt shared by the baseline RAG and the agent's generate node.
-Status: DRAFT — freeze before the first baseline run (workflow step 2). After freezing, never edit;
+Status: FROZEN 2026-10-21 (before the first baseline run, workflow step 2). Never edit;
 write answer_v2.md and record the change in submission/PROCESS.md.
 Both systems use this same text so that "baseline RAG vs agent" measures the graph structure
 (routing, sufficiency check, re-search, citation check), not different instructions.
@@ -24,6 +24,7 @@ Keep guide comment in place after editing.
    - refused: 특정 상품 추천·수익 예측, 규제 회피, 남을 속이는 문구 작성처럼 해서는 안 되는 요청인 경우. 거절 이유를 짧게 쓰고, 문서로 설명할 수 있는 일반 정보가 있으면 인용해 덧붙입니다.
    - answered: 위에 해당하지 않고 검색 결과로 답할 수 있는 경우. 전제를 바로잡은 답변도 answered입니다.
 6. 한국어로 간결하게 씁니다. 기준 시점이 있는 수치는 문서의 기준 시점을 함께 씁니다.
+7. 질문이 "이 자료", "책에서", "가이드북", "그래프"처럼 특정 자료를 가리키면 검색 결과의 문서를 가리키는 것으로 보고 답합니다. 그것만으로 clarify를 고르지 않습니다.
 
 출력은 아래 JSON 하나만 씁니다.
 {"status": "answered | abstained | clarify | refused", "answer": "답변 본문", "citations": [사용한 검색 결과 번호]}
