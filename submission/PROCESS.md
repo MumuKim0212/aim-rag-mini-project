@@ -272,11 +272,11 @@ test 실행 전에 아래 표를 채우고 커밋한다. 이후 바꾸지 않는
 
 | 실행 | 설정 파일 | 실험 이름 | 처음 RAG 대비 바뀐 것 | 커밋 |
 |---|---|---|---|---|
-| T1 처음 RAG | `configs/baseline.yaml` | `test_000_baseline` | – | (test 실행 때 기록) |
-| T2 개선된 RAG | `configs/013-rerank-flash36.yaml` | `test_013_rerank_flash36` | 청킹 구조 단위(용어집·약관) + 나머지 Recursive 950/119, 검색 Hybrid α0.5 후보 15개 → LLM rerank로 5개(`rerank_v1`, 재순위 모델 = 답변 모델), 답변 모델 `gemini-3.6-flash`, 답변 프롬프트 `answer_v4` (사용자 채택 2026-10-22, 카드 013) | (test 실행 때 기록) |
-| T3 Agent | `configs/008b-agent-950.yaml` | `test_008b_agent950` | T2 대비: 그래프만 (classify·grade·rewrite+재검색·cite_check). 노드 모델은 모두 답변 모델 `gemini-3.6-flash`로 같음. 검색 노드는 T2와 같은 rerank를 거친다(2026-10-22 코드 변경, Agent는 새 설정으로 dev에서 돌려 보지 않았다) | (test 실행 때 기록) |
+| T1 처음 RAG | `configs/baseline.yaml` | `test_000_baseline` | – | `d8efc09` |
+| T2 개선된 RAG | `configs/013-rerank-flash36.yaml` | `test_013_rerank_flash36` | 청킹 구조 단위(용어집·약관) + 나머지 Recursive 950/119, 검색 Hybrid α0.5 후보 15개 → LLM rerank로 5개(`rerank_v1`, 재순위 모델 = 답변 모델), 답변 모델 `gemini-3.6-flash`, 답변 프롬프트 `answer_v4` (사용자 채택 2026-10-22, 카드 013) | `d8efc09` |
+| T3 Agent | `configs/008b-agent-950.yaml` | `test_008b_agent950` | T2 대비: 그래프만 (classify·grade·rewrite+재검색·cite_check). 노드 모델은 모두 답변 모델 `gemini-3.6-flash`로 같음. 검색 노드는 T2와 같은 rerank를 거친다(2026-10-22 코드 변경, Agent는 새 설정으로 dev에서 돌려 보지 않았다) | `d8efc09` |
 
-- 최종 시스템(dev 기준으로 미리 정함): _T2 / T3, 이유_
+- 최종 시스템(dev 기준으로 미리 정함): **T2** (dev 0.928). 이유: Agent는 카드 008에서 기준 미달(점수 0.856 vs 0.822, 순승 +3, 비용 약 2배)이었고, 새 설정(rerank·v4)에서는 dev를 돌려 보지 않았다. T3는 구조 효과를 재려고 test에서 한 번 돌릴 뿐 최종 후보가 아니다. 설정 파일 상태 커밋 = 표의 커밋 열.
 - 실행 일시, 결과 요약과 EVALUATION.md 링크: _..._
 
 ### 10. 사고와 교훈
