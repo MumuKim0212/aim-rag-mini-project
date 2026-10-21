@@ -31,6 +31,13 @@ GUIDE: 진행 과정 기록. docs/WORKFLOW.md의 단계 순서대로, 무엇을 
 | 대리 지표 선택 (5절) | 4 | henry | 완료 | Henry | 2026-10-21 |
 | dev 실패 분류 (6절) | 5 | henry | 완료 | Henry | 2026-10-21 |
 | 청킹 비교 카드 001 (청크 크기 400/800/1200, `experiments/001-chunk-size.md`) | 6 | LimDaeJin | 진행 중 | LimDaeJin/card-001-chunk-size | 2026-10-21 |
+| 카드 001 후속: 1000/125 dev 답변 실행·채점 (002–007의 비교 기준) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
+| 카드 002 구조 단위 청킹 (1000/125 기준) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
+| 카드 003 문서명·상위 제목 머리말 (1000/125 기준) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
+| 카드 004 검색 방식 vector/BM25/hybrid (1000/125 기준) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
+| 카드 005 검색량 k·MMR (1000/125 기준) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
+| 카드 006 임베딩 모델 (1000/125 기준) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
+| 카드 007 답변 모델 (1000/125 기준) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
 
 상태 값: `대기` / `진행 중` / `검토 중` / `완료` / `보류`
 
