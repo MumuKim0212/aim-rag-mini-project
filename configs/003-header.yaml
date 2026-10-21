@@ -1,0 +1,7 @@
+base: 002-structure.yaml
+name: 003_header
+card: experiments/003-header.md
+description: Structure chunking (card 002, adopted) plus a document-name / article-heading header line on glossary and terms chunks
+compare_to: dev_002_structure
+chunking:
+  add_header: true

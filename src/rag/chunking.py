@@ -19,6 +19,7 @@ import pymupdf
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from . import ROOT
+from .ingest import title_of
 
 CHUNKERS: dict[str, Callable[[list[dict], dict], list[dict]]] = {}
 SEPARATORS = ["\n\n", "\n", ". ", " ", ""]
@@ -43,8 +44,8 @@ def chunk_pages(pages: list[dict], cfg: dict) -> list[dict]:
     method = cfg["chunking"]["method"]
     if method not in CHUNKERS:
         raise KeyError(f"unknown chunking.method {method!r}; registered: {sorted(CHUNKERS)}")
-    if cfg["chunking"].get("add_header"):
-        raise NotImplementedError("chunking.add_header — card 003")
+    if cfg["chunking"].get("add_header") and method != "structure":
+        raise NotImplementedError("chunking.add_header is implemented for chunking.method 'structure' only (card 003)")
     chunks = CHUNKERS[method](pages, cfg)
     ids = [c["chunk_id"] for c in chunks]
     if len(ids) != len(set(ids)):
@@ -131,12 +132,26 @@ def _add_line(group: dict, page: int, text: str) -> None:
     group["segments"][-1]["lines"].append(text)
 
 
+def _header(file: str, group: dict, text: str, cfg: dict) -> str:
+    """Card 003: "[문서명]" line, plus the article heading when the chunk does not already start with it
+    (the continuation pieces of a long article, which otherwise carry no label)."""
+    title = title_of(file, cfg)
+    first = group["segments"][0]["lines"][0]
+    if ARTICLE.match(first) and not text.startswith(first):
+        return f"[{title} > {first.strip()}]"
+    return f"[{title}]"
+
+
 def _chunk_groups(file: str, groups: list[dict], cfg: dict, counters: dict) -> list[dict]:
     """A group that fits chunking.chunk_size is one chunk; a longer one is split per page with the
-    baseline splitter, so every chunk keeps the page its text is on."""
+    baseline splitter, so every chunk keeps the page its text is on. With chunking.add_header the header
+    line is put in front afterwards, so chunk_size limits the text and not the header."""
     splitter, limit, chunks = _splitter(cfg), cfg["chunking"]["chunk_size"], []
+    add_header = cfg["chunking"].get("add_header")
 
-    def emit(text: str, page: int, pages: list[int]) -> None:
+    def emit(text: str, page: int, pages: list[int], group: dict) -> None:
+        if add_header:
+            text = _header(file, group, text, cfg) + "\n" + text
         n = counters.get(page, 0)
         counters[page] = n + 1
         chunks.append({"chunk_id": f"{doc_id(file)}-p{page:03d}-{n:02d}", "source": file, "page": page,
@@ -149,12 +164,12 @@ def _chunk_groups(file: str, groups: list[dict], cfg: dict, counters: dict) -> l
         if not total:
             continue
         if len(total) <= limit:
-            emit(total, pages[0], pages)
+            emit(total, pages[0], pages, group)
             continue
         for seg, text in zip(group["segments"], texts):
             for part in (t.strip() for t in splitter.split_text(text)):
                 if part:
-                    emit(part, seg["page"], [seg["page"]])
+                    emit(part, seg["page"], [seg["page"]], group)
     return chunks
 
 

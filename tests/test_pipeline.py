@@ -188,3 +188,19 @@ def test_structure_glossary_one_chunk_per_term(cfg):
     assert "금융용어 모음" not in " ".join(c["content"] for c in chunks)
     wrapped = [c for c in chunks if c["content"].startswith("후불교통카드 겸용 체크카드")]
     assert len(wrapped) == 1 and "사용할 수 있음" in wrapped[0]["content"]             # a definition wrapping over lines stays whole
+
+
+def test_add_header_labels_every_chunk_and_restores_the_article_heading(cfg):
+    cfg["chunking"].update(method="structure", add_header=True, chunk_size=60, chunk_overlap=5)
+    cfg["corpus"]["titles"]["t.pdf"] = "테스트약관"
+    pages = [{"file": "t.pdf", "path": "standard_terms/t.pdf", "page": 1,
+              "text": "1\n표지\n제1조(짧다)\n짧은 조.\n제2조(길다)\n" + "가나다라마바사 " * 12}]
+    chunks = chunking.chunk_pages(pages, cfg)
+    heads = [c["content"].split("\n")[0] for c in chunks]
+    assert heads[0] == "[테스트약관]" and chunks[0]["content"].endswith("표지")       # preamble: document name only
+    assert heads[1] == "[테스트약관]" and chunks[1]["content"].split("\n")[1] == "제1조(짧다)"  # starts with its own heading
+    continuation = [c for c in chunks[3:]]
+    assert continuation and all(c["content"].startswith("[테스트약관 > 제2조(길다)]\n") for c in continuation[1:])
+    cfg["chunking"]["method"] = "recursive"
+    with pytest.raises(NotImplementedError):
+        chunking.chunk_pages(pages, cfg)
