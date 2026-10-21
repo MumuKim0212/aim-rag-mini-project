@@ -1,0 +1,7 @@
+base: baseline.yaml
+name: 001b_chunk500
+card: experiments/001b-chunk-size-fine.md
+description: Recursive 500/62 (overlap = size/8 rounded), otherwise baseline
+chunking:
+  chunk_size: 500
+  chunk_overlap: 62
