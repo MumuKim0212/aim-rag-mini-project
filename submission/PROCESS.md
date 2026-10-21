@@ -38,6 +38,7 @@ GUIDE: 진행 과정 기록. docs/WORKFLOW.md의 단계 순서대로, 무엇을 
 | 카드 005 검색량 k·MMR (1000/125 기준) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
 | 카드 006 임베딩 모델 (1000/125 기준) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
 | 카드 007 답변 모델 (1000/125 기준) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
+| 카드 007b 3.1-flash-lite 확인 (재실행 + 800/100) | 6 | LimDaeJin | 진행 중 | LimDaeJin/cards-002-007 | 2026-10-21 |
 
 상태 값: `대기` / `진행 중` / `검토 중` / `완료` / `보류`
 
