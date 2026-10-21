@@ -212,7 +212,7 @@
   "scores": {
     "correctness_mean": 0.6667,
     "fully_correct": 0.5111,
-    "status_ok": 0.7889,
+    "status_ok": 0.8,
     "citation_in_context": 1.0,
     "citation_on_target": 0.8108
   },
@@ -228,7 +228,7 @@
       "n": 20,
       "correctness_mean": 0.7,
       "fully_correct": 0.6,
-      "status_ok": 0.7,
+      "status_ok": 0.75,
       "page_hit@5": 1.0
     },
     "base_positive": {
@@ -279,5 +279,5 @@
     "p50": 1.541,
     "p90": 1.979
   },
-  "created_at": "2026-10-21T09:36:56"
+  "created_at": "2026-10-21T09:53:17"
 }

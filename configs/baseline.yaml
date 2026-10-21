@@ -88,7 +88,7 @@ judge:
   model: gemini-3.6-flash       # fixed for the whole project; never one of the answer candidates
   prompt: prompts/judge_v1.md
   temperature: 0                # ignored by gemini-3.6-flash: judge noise must be measured (workflow step 3b)
-  thinking_level: low           # 3.6-flash still thinks at low (~390 tokens/call), billed as output
+  thinking_level: low           # structured grading used ~1 thinking token/call (270 calls, 293 tokens; PROCESS.md §0); billed as output
 
 run:
   concurrency: 4
