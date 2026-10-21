@@ -1,0 +1,7 @@
+base: 002-structure.yaml
+name: 002b_structure900
+card: experiments/002b-answer-runs-900-and-structure.md
+description: Structure units for glossary/terms (card 002) plus Recursive 900/112 for the other documents
+chunking:
+  chunk_size: 900
+  chunk_overlap: 112

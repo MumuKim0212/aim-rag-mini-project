@@ -23,8 +23,13 @@ class AnswerOut(BaseModel):
     citations: list[int]
 
 
+def page_label(unit: dict) -> str:
+    pages = unit.get("pages") or [unit["page"]]
+    return f"p.{pages[0]}" if len(pages) == 1 else f"p.{pages[0]}-{pages[-1]}"  # a unit can run over a page break
+
+
 def render_context(units: list[dict]) -> str:
-    return "\n\n".join(f"[{i}] ({u['source']}, p.{u['page']})\n{u['content']}" for i, u in enumerate(units, 1))
+    return "\n\n".join(f"[{i}] ({u['source']}, {page_label(u)})\n{u['content']}" for i, u in enumerate(units, 1))
 
 
 def generate_answer(question: str, units: list[dict], cfg: dict, steps: dict, node: str = "generate") -> AnswerOut:
@@ -46,12 +51,13 @@ def map_citations(numbers: list[int], units: list[dict]) -> tuple[list[dict], li
         elif n not in seen:
             seen.add(n)
             u = units[n - 1]
-            citations.append({"chunk_id": u["chunk_id"], "source": u["source"], "page": u["page"]})
+            citations.append({"chunk_id": u["chunk_id"], "source": u["source"], "page": u["page"],
+                              **({"pages": u["pages"]} if len(u.get("pages") or []) > 1 else {})})
     return citations, invalid
 
 
 def format_answer(answer: str, citations: list[dict]) -> str:
-    pages = list(dict.fromkeys((c["source"], c["page"]) for c in citations))
+    pages = list(dict.fromkeys((c["source"], p) for c in citations for p in c.get("pages") or [c["page"]]))
     if not pages:
         return answer
     return answer + "\n\n출처:\n" + "\n".join(f"- {source} p.{page}" for source, page in pages)

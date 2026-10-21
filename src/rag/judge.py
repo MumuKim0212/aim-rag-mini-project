@@ -82,6 +82,6 @@ def citation_check(item: dict, run: dict) -> dict:
     return {
         "n_citations": len(citations),
         "in_context": int(all(c["chunk_id"] in context_ids for c in citations)) if citations else None,
-        "on_target": (int(any((nfc(c["source"]), c["page"]) in targets for c in citations))
+        "on_target": (int(any((nfc(c["source"]), p) in targets for c in citations for p in c.get("pages") or [c["page"]]))
                       if targets else None),
     }

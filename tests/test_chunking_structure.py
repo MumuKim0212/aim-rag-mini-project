@@ -89,3 +89,17 @@ def test_real_corpus_invariants():
             listing = "\n".join(p["text"] for p in allp if p["file"] == file and first <= p["page"] <= last)
             assert len([c for c in group if chunking.ARTICLE.match(c["content"])]) == \
                 len(re.findall(r" / 제\s?\d+\s?조", listing)), file
+
+
+def test_answer_step_shows_every_page_of_a_unit():
+    from rag import rag
+    from rag.judge import citation_check
+    one = {"chunk_id": "c1", "source": "a.pdf", "page": 3, "pages": [3], "content": "x"}
+    two = {"chunk_id": "c2", "source": "a.pdf", "page": 3, "pages": [3, 4], "content": "y"}
+    assert rag.render_context([one, two]) == "[1] (a.pdf, p.3)\nx\n\n[2] (a.pdf, p.3-4)\ny"
+    citations, _ = rag.map_citations([1, 2], [one, two])
+    assert "pages" not in citations[0] and citations[1]["pages"] == [3, 4]  # single-page citations unchanged
+    assert rag.format_answer("답", citations).endswith("- a.pdf p.3\n- a.pdf p.4")
+    item = {"targets": [{"file": "a.pdf", "page": 4}]}
+    assert citation_check(item, {"citations": citations[1:], "context": [two]})["on_target"] == 1
+    assert citation_check(item, {"citations": citations[:1], "context": [one]})["on_target"] == 0
