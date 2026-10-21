@@ -1,0 +1,7 @@
+base: 002-structure.yaml
+name: 007_lite31
+card: experiments/007-answer-model.md
+description: Structure chunking + vector k=5 (adopted), answer model gemini-3.1-flash-lite
+compare_to: dev_002_structure_all
+answer:
+  model: gemini-3.1-flash-lite
