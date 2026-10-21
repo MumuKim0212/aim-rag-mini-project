@@ -58,7 +58,7 @@ Runs `dev_001b_chunk500_retrieval`, `dev_001b_chunk700_retrieval`, `dev_001b_chu
 
 ## 6. Answer run (only if allowed)
 
-Not run: the headroom gate failed (11 ≤ 14). LLM calls used: 0.
+The headroom gate failed (11 ≤ 14). The project owner waived it on 2026-10-21; the answer run of 900/112 is `dev_001b_chunk900`, recorded with its criteria in card 002b (score 0.717 vs 0.722, net +1, not adoptable). LLM calls used: 90 answers + 90 judge.
 
 ## 7. Decision and notes
 

@@ -60,7 +60,7 @@ Run `dev_002_structure_retrieval` (2026-10-21, 74 dev questions with gold pages)
 
 ## 6. Answer run (only if the gates passed)
 
-Not run (headroom gate). LLM calls used: 0. Embedding cost: index builds 0.138 USD, scopes A and B.
+Not run as specified (headroom gate failed). The project owner waived the gate on 2026-10-21 for the variant structure + 900/112 for the other documents; it is `dev_002b_structure900` in card 002b (score 0.756 vs 0.722, net +2, not adoptable by the criteria, best of the three on point estimate). Structure units with 800/100 for the other documents were not run at the answer level. Embedding cost: index builds 0.138 USD, scopes A and B.
 
 ## 7. Decision and notes
 

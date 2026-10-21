@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 002b: Answer runs — 900/112 alone and structure + 900/112
 
-Status: planned
+Status: answer runs done (neither candidate adoptable by the criteria; decision on B pending the owner)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -44,8 +44,33 @@ Date: 2026-10-21
 
 ## 5. Results
 
-_filled after the runs_
+Runs `dev_001b_chunk900` (A) and `dev_002b_structure900` (B), dev 90, 0 errors, 2026-10-21. Baseline `dev_000_baseline`.
+
+| | Baseline 800/100 | A: 900/112 | B: structure + 900 |
+|---|---|---|---|
+| Answer score (0–1) | 0.722 | 0.717 | **0.756** |
+| Fully correct | 51 (56.7%) | 51 (56.7%) | 52 (57.8%) |
+| Paired vs baseline (better / worse / same) | – | 10 / 9 / 71, diff −0.006, CI [−0.072, +0.061] | 13 / 11 / 66, diff +0.033, CI [−0.033, +0.106] |
+| Net wins / changed questions | – | +1 / 19 | +2 / 24 |
+| Status match (`status_ok`) | 82.2% | 83.3% | 92.2% |
+| Citation on a gold page | 81.1% | 86.5% | 91.9% |
+| `evid@5` (74 gold questions) | 0.697 | 0.771 | 0.838 (24 up / 4 down) |
+| Context chars | 3,064 | 3,428 | 2,700 |
+| Tokens / question | 2,916 | 3,155 (1.08×) | 2,622 (0.90×) |
+| USD / question (answer) | 0.00116 | 0.00123 | 0.00107 |
+| p90 latency | 2.07 s | 1.89 s | 1.88 s |
+| Garbled outputs (`garble_scan`) | 2 runs in earlier scans (POS054) | 1 (POS013, abstained) | 0 |
+
+- By set (score): base_positive 0.683 / 0.717 / 0.817; base_negative 0.800 / 0.725 / 0.800; life_guide 0.750 / 0.700 / 0.700; additional 0.700 / 0.717 / 0.683.
+- A better than baseline: ADD-HF06 ADD-HF07 ADD-IN10 ADD-SE04 NEG037 NEG039 POS001 POS021 POS052 POS061; worse: ADD-HP10 ADD-RP07 ADD-SE06 NEG009 NEG013 NEG019 POS044 POS064 POS070.
+- B better than baseline: ADD-HF06 ADD-IN10 ADD-SE04 NEG025 NEG037 NEG039 POS001 POS006 POS013 POS021 POS052 POS058 POS061; worse: ADD-HP10 ADD-RP01 ADD-RP07 ADD-SE03 ADD-SE06 NEG009 NEG013 POS022 POS057 POS064 POS074.
+- B vs A: 9 better / 6 worse / 75 same, diff +0.039, CI [−0.011, +0.100], net +3.
+- The baseline rerun changed 14 questions with net −8; both candidates changed about as many questions as that and their nets (+1, +2) are far smaller.
 
 ## 6. Decision and notes
 
-_filled after the runs_
+- Rule outcome: **neither candidate is adoptable** (net wins +1 and +2 against the required 9; CIs include 0; changed questions 19 and 24 are above 14 but the net is inside the noise). By the rule the baseline 800/100 stays: the retrieval gains did not turn into a measurable answer gain on dev.
+- What the data does show: B has the highest point estimate of the three (0.756 vs 0.722 and 0.717), the best status match (92.2% vs 82.2%) and citation accuracy (91.9% vs 81.1%), the shortest context, 10% fewer tokens and no garbled output; it does not look worse than the baseline on any measure. A does not improve the score and costs 8% more tokens. These are secondary measures not named in the criteria, and the score difference is inside the noise, so they support "B is not worse and is cheaper", not "B is more accurate".
+- Where B's gain sits: `base_positive` 0.683 → 0.817 (glossary and terms questions POS001 POS006 POS013 POS021 POS052 POS058 improved, POS022 POS057 POS074 got worse). `additional` and `life_guide` did not improve although they use the 900 splitter, consistent with A.
+- Using B as the improved RAG (T2) is a choice by point estimate and cost, not by the adopt rule; it needs the project owner's decision and must be stated as such in EVALUATION.md. The test run (T1 vs T2) is the one confirmation.
+- What the criteria missed: nothing was changed after the results. With 90 dev questions and a rerun noise of 14 changed questions, an answer-level gain of +0.03 (about 3 questions) cannot be separated from noise; the retrieval-level evidence is the stronger part of the case for B.
