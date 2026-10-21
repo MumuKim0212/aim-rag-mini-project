@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 004: Retrieval method — vector vs BM25 vs Hybrid (H3)
 
-Status: decided (retrieval stays vector; no variant passed the LLM-free gate, no answer run)
+Status: decided (gate outcome: no variant passed; owner adopted hybrid into the chain on 2026-10-21)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -56,11 +56,12 @@ Runs `dev_004_bm25_retrieval`, `dev_004_hybrid_retrieval` (2026-10-21, 74 dev qu
 
 ## 6. Answer run (only if allowed)
 
-Not run: no variant passed the LLM-free gate. LLM calls used: 0 (hybrid query embeddings 0.0014 USD).
+_filled below after the chain answer run_
 
 ## 7. Decision and notes
 
-- Decision: **bm25 rejected; hybrid not adopted. Retrieval stays vector search (k=5).** The retrieval comparison PLAN.md §3.2 asks for is done at the retrieval level.
+- Decision by the criteria: **bm25 rejected; hybrid not adopted (retrieval would stay vector search, k=5).** The retrieval comparison PLAN.md §3.2 asks for is done at the retrieval level.
+- **Owner decision (2026-10-21): hybrid (α 0.5) is adopted into the chain**, chosen by the highest point estimate (0.853) and the most questions with all evidence in context (50), not by the gate. Later cards use `configs/004-hybrid.yaml` as their base. Its answer-level effect is measured by the chain answer run `dev_004_hybrid` (section 6).
 - Why, with question IDs: the chain's glossary and terms chunks are short, title-prefixed units that the embedding already matches almost perfectly on term questions (`base_positive` 0.962); BM25 loses 12 questions the vector search gets right there and elsewhere (e.g. POS044 POS047 POS050 POS058 POS059) and wins 12 (POS026 POS054 POS070 POS074 ADD-RP05 ADD-RP06 ADD-HF05 ADD-HF06 ADD-SE03 ADD-SE06 ADD-PF08 ADD-PF09). Hybrid keeps the vector strengths and picks up some of BM25's wins (POS026 POS054 POS070 POS074 ADD-RP05 ADD-HF05 ADD-SE03 ADD-SE06 ADD-PF08) and raises the number of questions with all evidence in context from 47 to 50, but loses 7 and the gain (+0.015, 3 questions net) is below both bars.
 - Not tested: other `hybrid_alpha` values (pre-registered as not tuned), BM25 text with the title prefix, a different BM25 tokenizer. A hybrid that wins on dev by tuning alpha would be a pick among several tries on 74 questions.
 - What the criteria missed, if anything: nothing was changed after the results. The BM25 side differs from the vector side by more than the method (no title prefix, Kiwi morphemes), so "BM25 is worse" means this BM25 configuration.
