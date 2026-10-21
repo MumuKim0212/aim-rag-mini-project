@@ -1,0 +1,7 @@
+base: baseline.yaml
+name: 001_chunk400
+card: experiments/001-chunk-size.md
+description: Recursive 400/50 (overlap ~12.5%, same as baseline), vector k=5
+chunking:
+  chunk_size: 400
+  chunk_overlap: 50
