@@ -1,0 +1,7 @@
+base: 012-flash36-v4.yaml
+name: 013_rerank_flash36
+card: experiments/013-rerank.md
+compare_to: dev_012_flash36_v4
+description: "3.6-flash + prompt v4 with LLM rerank: hybrid pool 15, 3.6-flash picks 5 (card 013, R1)"
+retrieval:
+  rerank_pool: 15

@@ -1,0 +1,7 @@
+base: 011c-lite-v4.yaml
+name: 013b_rerank_lite
+card: experiments/013-rerank.md
+compare_to: dev_011c_lite_v4
+description: "lite + prompt v4 with LLM rerank: hybrid pool 15, lite picks 5 (card 013, R2)"
+retrieval:
+  rerank_pool: 15

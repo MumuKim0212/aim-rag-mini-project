@@ -210,9 +210,9 @@ class HybridRetriever:
         self.cfg, self.alpha = cfg, cfg["retrieval"]["hybrid_alpha"]
         self.vector, self.bm25 = VectorRetriever(cfg, scope), BM25Retriever(cfg, scope)
 
-    def search(self, query: str, steps: dict | None = None) -> list[dict]:
+    def search(self, query: str, steps: dict | None = None, k: int | None = None) -> list[dict]:
         steps = steps if steps is not None else {}
         v = {u["chunk_id"]: u for u in self.vector.search(query, steps, k=FUSE_POOL)}
         b = {u["chunk_id"]: u for u in self.bm25.search(query, steps, k=FUSE_POOL)}
         fused = fuse({c: u["score"] for c, u in v.items()}, {c: u["score"] for c, u in b.items()}, self.alpha)
-        return [{**(v.get(c) or b[c]), "score": round(score, 4)} for c, score in fused[:self.cfg["retrieval"]["k"]]]
+        return [{**(v.get(c) or b[c]), "score": round(score, 4)} for c, score in fused[:k or self.cfg["retrieval"]["k"]]]

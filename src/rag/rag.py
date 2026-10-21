@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from . import llm
 from .prompts import fill, load_prompt
+from .rerank import rerank
 from .retrieval import load_retriever
 
 
@@ -76,7 +77,12 @@ class BaselineRAG:
             return self._retrievers[scope]
 
     def retrieve(self, question: str, scope: str, steps: dict | None = None) -> list[dict]:
-        return self._retriever(scope).search(question, steps)
+        r = self.cfg["retrieval"]
+        if not r.get("rerank_pool"):
+            return self._retriever(scope).search(question, steps)
+        pool = self._retriever(scope).search(question, steps, k=r["rerank_pool"])
+        return rerank(question, pool, r["k"], r.get("rerank_model") or self.cfg["answer"]["model"], self.cfg,
+                      steps if steps is not None else {})
 
     def run(self, question: str, scope: str) -> dict:
         steps = {"calls": []}
