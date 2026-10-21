@@ -26,7 +26,7 @@ Small, dependency-free tools (Python 3.10+, standard library only) that make mos
 
 Golden item (`golden/README.md`): `qid`, `targets` [{`file`, `page`}], `evidence` [verbatim quotes], plus `split`, `answerable`, and slicing fields.
 
-Unit (retrieved chunk or page): `{"chunk_id", "source", "page", "content"}`. `source` must use the same file names as the golden `targets` (both are NFC-normalized when compared).
+Unit (retrieved chunk or page): `{"chunk_id", "source", "page", "content"}`, plus an optional `pages` list when a unit runs over a page break (`is_gold` counts every listed page). `source` must use the same file names as the golden `targets` (both are NFC-normalized when compared).
 
 System run result passed to `RunLog.save`: any of `system, config, question, answer, status, searches, context, citations, steps, n_searches, n_llm_calls, input_tokens, output_tokens, latency_s, error`. `context` is the exact list of units given to the answer step.
 

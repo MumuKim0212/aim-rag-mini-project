@@ -48,7 +48,8 @@ def target_pages(item: dict) -> set[tuple[str, int]]:
 
 
 def is_gold(unit: dict, targets: set) -> bool:
-    return (nfc(unit["source"]), unit["page"]) in targets
+    # A unit that runs over a page break lists every page it covers in `pages`.
+    return any((nfc(unit["source"]), p) in targets for p in unit.get("pages") or [unit["page"]])
 
 
 def coverage(segments: list[str], units: list[dict]) -> float | None:

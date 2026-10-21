@@ -1,0 +1,7 @@
+base: baseline.yaml
+name: 002_structure
+card: experiments/002-chunk-method.md
+description: Structure units (glossary term, terms article <=1600 chars, preamble); other documents Recursive 800/100
+chunking:
+  method: structure
+  max_chars: 1600
