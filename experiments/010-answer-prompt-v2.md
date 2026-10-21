@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 010: Answer prompt v2 (aim: as many fully correct answers as possible)
 
-Status: decided by the criteria (v1 stays); v2 adoption is an open owner decision; v3 not tried
+Status: decided by the criteria (v1 stays), then adopted by the owner on 2026-10-21; v3 not tried
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -63,4 +63,5 @@ Run `dev_010_answerv2` (2026-10-21, dev 90, 0 errors, 90 answers + 90 judge, ans
 
 - Decision by the criteria: **v1 stays**; v2 is not adopted. v3 is not tried: the pre-registered condition for it (a clear, general failure pattern in the regressions) is not met — the six drops are one-point omissions of different required points and two negative-question details, with no common rule to add.
 - Why: +0.017 is inside the noise and the regression limit is exceeded. The target 1.0 is far away: 21 of 90 answers are still imperfect, of which about half are questions whose evidence is not completely in the five retrieved chunks (retrieval, not the prompt) and the rest are strict required-point omissions of the judge.
-- Open owner decision: adopt v2 anyway by point estimate (0.861 vs 0.844, status match 96.7% vs 94.4%, the three refusals fixed), at +24% answer cost and +0.8 s p90, as was done for structure + 900, hybrid and 950. The dev gain is optimistic (see above); the test run is the unbiased check. If adopted: `configs/001e-chunk950-chain.yaml` (T2) and `configs/008b-agent-950.yaml` (T3) point to `answer_v2.md`, T1 keeps v1, and PROCESS.md §9 is updated before the test.
+- **Owner decision (2026-10-21): v2 is adopted** ("채택하고"), by point estimate and not by the adopt rule. T2 of the final test is `configs/010-answer-v2.yaml` (experiment `test_010_answerv2`), T3 is `configs/008b-agent-950.yaml` (now based on it); T1 keeps v1. The agent's dev run (`dev_008_agent`) was made with v1 on the 900 chain and has not been repeated with v2.
+- (Was open before that decision) adopt v2 anyway by point estimate (0.861 vs 0.844, status match 96.7% vs 94.4%, the three refusals fixed), at +24% answer cost and +0.8 s p90, as was done for structure + 900, hybrid and 950. The dev gain is optimistic (see above); the test run is the unbiased check. If adopted: `configs/001e-chunk950-chain.yaml` (T2) and `configs/008b-agent-950.yaml` (T3) point to `answer_v2.md`, T1 keeps v1, and PROCESS.md §9 is updated before the test.

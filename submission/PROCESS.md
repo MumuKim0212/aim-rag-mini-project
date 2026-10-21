@@ -30,7 +30,7 @@ GUIDE: 진행 과정 기록. docs/WORKFLOW.md의 단계 순서대로, 무엇을 
 | 잡음 측정 (재실행·재채점, 4절) | 3 | henry | 완료 | Henry | 2026-10-21 |
 | 대리 지표 선택 (5절) | 4 | henry | 완료 | Henry | 2026-10-21 |
 | dev 실패 분류 (6절) | 5 | henry | 완료 | Henry | 2026-10-21 |
-| 청킹 비교 카드 001·001b·001c(청크 크기)·002·002b(구조 단위, 답변 실행): 실험 끝. 개선 RAG 체인 = 구조 단위 + 나머지 900/112 (사용자 채택 2026-10-21). 카드 004(검색 방식) 끝: 기준은 미달이나 사용자가 Hybrid 채택(2026-10-21). 체인 = 구조 단위 + 900 + Hybrid. 카드 005(k) 끝: k=5 유지. 카드 007(답변 모델) 끝: 사용자 지시로 최종 답변 모델 = gemini-3.6-flash (dev 0.822). 카드 008(Agent) 끝: dev에서 기준 미달 → 최종 시스템 = 기본 RAG. 최종 체인 = 구조 단위 + 나머지 950/119 + Hybrid k=5 + gemini-3.6-flash (사용자 결정 2026-10-21). 다음 자작 골든셋 → 최종 test(T1·T2·T3), EVALUATION.md | 7 | Serin-91 | 진행 중 | serin-91/chunking-cards-001-002 | 2026-10-21 |
+| 청킹 비교 카드 001·001b·001c(청크 크기)·002·002b(구조 단위, 답변 실행): 실험 끝. 개선 RAG 체인 = 구조 단위 + 나머지 900/112 (사용자 채택 2026-10-21). 카드 004(검색 방식) 끝: 기준은 미달이나 사용자가 Hybrid 채택(2026-10-21). 체인 = 구조 단위 + 900 + Hybrid. 카드 005(k) 끝: k=5 유지. 카드 007(답변 모델) 끝: 사용자 지시로 최종 답변 모델 = gemini-3.6-flash (dev 0.822). 카드 008(Agent) 끝: dev에서 기준 미달 → 최종 시스템 = 기본 RAG. 최종 체인 = 구조 단위 + 나머지 950/119 + Hybrid k=5 + gemini-3.6-flash + 답변 프롬프트 v2 (사용자 결정 2026-10-21, 카드 010; T1은 v1). 다음 자작 골든셋 → 최종 test(T1·T2·T3), EVALUATION.md | 7 | Serin-91 | 진행 중 | serin-91/chunking-cards-001-002 | 2026-10-21 |
 
 상태 값: `대기` / `진행 중` / `검토 중` / `완료` / `보류`
 
@@ -262,7 +262,7 @@ test 실행 전에 아래 표를 채우고 커밋한다. 이후 바꾸지 않는
 | 실행 | 설정 파일 | 실험 이름 | 처음 RAG 대비 바뀐 것 | 커밋 |
 |---|---|---|---|---|
 | T1 처음 RAG | `configs/baseline.yaml` | `test_000_baseline` | – | (test 실행 때 기록) |
-| T2 개선된 RAG | `configs/001e-chunk950-chain.yaml` | `test_001e_chunk950chain` | 청킹 구조 단위(용어집·약관) + 나머지 Recursive 950/119, 검색 Hybrid α0.5, 답변 모델 `gemini-3.6-flash` | (test 실행 때 기록) |
+| T2 개선된 RAG | `configs/010-answer-v2.yaml` | `test_010_answerv2` | 청킹 구조 단위(용어집·약관) + 나머지 Recursive 950/119, 검색 Hybrid α0.5, 답변 모델 `gemini-3.6-flash`, 답변 프롬프트 `answer_v2` | (test 실행 때 기록) |
 | T3 Agent | `configs/008b-agent-950.yaml` | `test_008b_agent950` | T2 대비: 그래프만 (classify·grade·rewrite+재검색·cite_check). 노드 모델은 모두 답변 모델 `gemini-3.6-flash`로 같음 | (test 실행 때 기록) |
 
 - 최종 시스템(dev 기준으로 미리 정함): _T2 / T3, 이유_
