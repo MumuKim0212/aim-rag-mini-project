@@ -1,0 +1,7 @@
+base: 004-hybrid.yaml
+name: 007_flash38
+card: experiments/007-answer-model.md
+compare_to: dev_004_hybrid
+description: "Adopted chain (structure + 900/112 + hybrid k=5); answer model gemini-3.8-flash"
+answer:
+  model: gemini-3.8-flash
