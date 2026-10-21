@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 011: Answer model back to gemini-3.5-flash-lite, prompt tuned for it
 
-Status: running
+Status: decided (lite + prompt v4 is the best lite setting by point estimate; T2 stays on 3.6-flash until the owner decides)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -54,3 +54,17 @@ Date: 2026-10-21
 - Score **0.844** (fully correct 67, status match 94.4%, citation on gold page 96.0%). Paired against L1: v3 better 8 (ADD-HF10 ADD-IN08 ADD-PF01 ADD-SE06 NEG037 NEG039 POS044 POS047), L1 better 4 (ADD-HF06 ADD-HP10 POS058 POS078), diff +0.022, CI [−0.022, +0.067], net +4. Against 3.6-flash v2: −0.017, CI [−0.067, +0.033], net −2. Answer cost 1.17× L1 (0.49× of 3.6-flash), p90 3.1 s.
 - By the choosing rule (net ≥ 5): +4 does not qualify; v3 is not chosen on its own.
 - General failure pattern in the v3 changes: the refusal rule, now first in the order, sent answerable questions to `refused` (POS078 scam-case question, NEG039, ADD-HP06) and the risk statement leaked into normal answers. `answer_v4.md` (v3 with a narrowed rule ① only) is the last allowed version.
+
+### L3 `dev_011c_lite_v4` (lite + prompt v4; dev 90, 0 errors after resuming one read timeout)
+
+- Score **0.856** (fully correct 67, status match 95.6%, citation on gold page 93.2%). Paired against L2 (v3): v4 better 6 (ADD-HF06 ADD-HP10 POS054 POS058 POS061 POS078), v3 better 4 (ADD-HF10 ADD-IN01 POS022 POS057), diff +0.011, CI [−0.022, +0.044], net +2. Against L1 (v2): better 9 (ADD-IN08 ADD-PF01 ADD-SE06 NEG037 NEG039 POS044 POS047 POS054 POS061), worse 4 (ADD-IN01 POS022 POS057 POS078), diff +0.033, CI [−0.011, +0.072], net +5. Against 3.6-flash + v2 (0.861): diff −0.006, CI [−0.050, +0.044], 6 better / 7 worse, not distinguishable.
+- Answer cost per question 0.00164 USD vs 0.00329 (0.50×); p90 latency 3.7 s vs 4.3 s; tokens 3,762 vs 3,376.
+
+## 6. Answer run
+See section 5 (three lite runs, 90 answers + 90 judge each, one resumed call).
+
+## 7. Decision and notes
+
+- By the criteria: v4 against L1 meets net ≥ 5 (+5) and drops no fully correct answer beyond the limit (ADD-IN01, POS022, POS078 were 2 under v2, 3 drops ≤ 5), so v4 is the chosen lite prompt; against its immediate predecessor v3 the gain is +2, inside the noise, so the v3 → v4 step alone is "not distinguishable". The lite setting is 0.822 → 0.844 → 0.856; the distance to 3.6-flash (0.861) is not distinguishable at this size, at half the answer cost.
+- Honest limits: v3 and v4 were written from dev answers of this same set, so 0.856 is optimistic (the 9 gains include NEG037 NEG039 POS044 POS047 which were named when v3 was written); the unbiased check is the test. The loop is closed (v3, v4 used; no v5).
+- Not done: `configs/008b`/T2/T3 were not switched. If the owner wants lite in the final system, T2 becomes `configs/011c-lite-v4.yaml` (and T3 follows) and PROCESS.md §9 must be updated before the test.
