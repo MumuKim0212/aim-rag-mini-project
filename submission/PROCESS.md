@@ -30,6 +30,7 @@ GUIDE: 진행 과정 기록. docs/WORKFLOW.md의 단계 순서대로, 무엇을 
 | 잡음 측정 (재실행·재채점, 4절) | 3 | henry | 완료 | Henry | 2026-10-21 |
 | 대리 지표 선택 (5절) | 4 | henry | 완료 | Henry | 2026-10-21 |
 | dev 실패 분류 (6절) | 5 | henry | 완료 | Henry | 2026-10-21 |
+| 청킹 비교 카드 001 (청크 크기 400/800/1200, `experiments/001-chunk-size.md`) | 6 | LimDaeJin | 진행 중 | LimDaeJin/card-001-chunk-size | 2026-10-21 |
 
 상태 값: `대기` / `진행 중` / `검토 중` / `완료` / `보류`
 
