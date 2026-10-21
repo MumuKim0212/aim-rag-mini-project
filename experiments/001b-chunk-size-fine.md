@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 001b: Chunk size 500 / 700 / 900 (follow-up of 001)
 
-Status: planned
+Status: llm-free done (winner 900/112 at the retrieval level; headroom gate failed, so no answer run unless waived)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -44,21 +44,24 @@ Date: 2026-10-21
 | Config | Proxy metric (dev) | Net vs baseline (+/−) | Context chars |
 |---|---|---|---|
 | 400/50 (card 001) | 0.675 | 9 up / 19 down, net −10 | 1,670 |
-| 500/62 | | | |
-| 700/88 | | | |
+| 500/62 | 0.659 | 11 up / 21 down, net −10 | 2,065 |
+| 700/88 | 0.714 | 12 up / 9 down, net +3 | 2,737 |
 | baseline 800/100 | 0.697 | – | 3,064 |
-| 900/112 | | | |
+| 900/112 | **0.771** | 18 up / 4 down, net +14 | 3,428 |
 | 1200/150 (card 001) | 0.748 | 18 up / 8 down, net +10 | 4,166 |
 
-- Winner by the selection rule: _..._
-- Headroom: _..._
+Runs `dev_001b_chunk500_retrieval`, `dev_001b_chunk700_retrieval`, `dev_001b_chunk900_retrieval` (2026-10-21). Other numbers (500 / 700 / 800 / 900): `page_hit@5` 0.905 / 0.932 / 0.878 / 0.932, `mrr` 0.789 / 0.812 / 0.800 / 0.828, `gold@5` 2.20 / 2.08 / 1.92 / 1.97. Questions with `evid@5` = 1: 30 / 36 / 34 / 42; with 0: 12 / 9 / 11 / 8. Chunks (scope A / B): 480 / 1,832; 351 / 1,360; 309 / 1,212; 284 / 1,100. Index build cost (A + B): 0.144 / 0.141 / – / 0.139 USD.
+
+- Qualifying under the rule (≥ 0.727, net ≥ 5, context ≤ 4,596): 900 and 1200 only. 900 is highest (0.771 vs 0.748, a gap of 0.023 > the 0.01 tie band) and has the shorter context (3,428 vs 4,166). **Winner: 900/112.** 700 is above the baseline but under both bars (0.714, net +3); 500 is below the baseline like 400.
+- 900 improved: POS001 POS021 POS047 POS058 POS057 POS061 POS078 ADD-HP09 ADD-HF10 ADD-SE04 ADD-SE03 ADD-IN01 ADD-SE08 ADD-PF01 ADD-IN08 ADD-IN10 ADD-PF08 ADD-PF06. Worsened: NEG019 POS074 POS079 ADD-HF06. Dev quotes cut by chunking (scope A / B): 3 / 5 (baseline 1 / 6).
+- Headroom (`evid@5`, noise 14), 900: upside 14 (ADD-HF10 ADD-HP09 ADD-IN10 ADD-PF01 ADD-PF08 ADD-SE04 ADD-SE08 POS001 POS021 POS047 POS057 POS058 POS061 POS078), already correct among improved 4, risk 3 (NEG019 POS074 POS079). Upside − risk = 11 ≤ 14.
 
 ## 6. Answer run (only if allowed)
 
-_..._
+Not run: the headroom gate failed (11 ≤ 14). LLM calls used: 0.
 
 ## 7. Decision and notes
 
-- Decision: _..._
-- Why, with question IDs: _..._
-- What the criteria missed, if anything: _..._
+- Decision: **900/112 is the best chunk size at the retrieval level; the adopted size stays 800/100 until the headroom gate is waived in writing or an answer run is otherwise allowed.** Answer accuracy of 900 is not measured.
+- Why, with question IDs: the `evid@5` curve over 400 / 500 / 700 / 800 / 900 / 1200 is 0.675 / 0.659 / 0.714 / 0.697 / 0.771 / 0.748, not monotonic; 900 beats 1200 with a 19% shorter context, and has the most questions with all evidence in context (42, baseline 34) and the fewest with none (8, baseline 11). Its gain is across glossary, terms and the additional documents (POS001 POS021 POS047 POS057 POS058 POS078 ADD-HF10 ADD-HP09 ADD-PF08 ADD-SE04 ADD-SE08 among the 14 upside questions).
+- What the criteria missed, if anything: nothing was changed after the results. The dip at 500 and the rise at 900 show that `evid@5` moves by a few questions between neighbouring sizes; with six candidates on 74 questions, the winner's margin over 1200 (0.023) and over the baseline (0.074) is not proof that 900 is best in general. The headroom bar is the same as in cards 001 and 002 (see their section 7).

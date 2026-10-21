@@ -1,6 +1,6 @@
 # 실험 결과 요약
 
-생성: 2026-10-21T11:15:09 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
+생성: 2026-10-21T11:24:51 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
 
 | 실험 | 카드 | 변경 | n | 정답 점수 | 완전 정답 | 대응 일치 | 인용 정확 | page_hit@5 | evid@5 | gold@5 | USD/문항 | 토큰/문항 | LLM 호출/문항 | p50 s | p90 s | 비용 USD | 기준 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -8,4 +8,7 @@
 | dev_000_baseline_r2 | – | 기준 설정 | 90 | 0.667 (-0.055) | 51.1% (-5.6%) | 80.0% (-2.2%) | 81.1% | 0.878 | 0.697 | 1.92 | 0.00117 (+0.00001) | 2921 (+5) | 1.00 | 1.54 (-0.04) | 1.98 (-0.09) | 0.1056 | dev_000_baseline |
 | dev_001_chunk1200_retrieval | experiments/001-chunk-size.md | chunking.chunk_overlap: 100 → 150, chunking.chunk_size: 800 → 1200 | 90 | – | – | – | – | 0.905 (+0.027) | 0.748 (+0.050) | 1.80 (-0.12) | 0.00002 (-0.00115) | 77 (-2839) | 0.00 (-1.00) | 0.47 (-1.11) | 0.52 (-1.55) | 0.0014 | dev_000_baseline |
 | dev_001_chunk400_retrieval | experiments/001-chunk-size.md | chunking.chunk_overlap: 100 → 50, chunking.chunk_size: 800 → 400 | 90 | – | – | – | – | 0.905 (+0.027) | 0.675 (-0.022) | 2.49 (+0.57) | 0.00002 (-0.00115) | 77 (-2840) | 0.00 (-1.00) | 0.48 (-1.10) | 0.54 (-1.52) | 0.0014 | dev_000_baseline |
+| dev_001b_chunk500_retrieval | experiments/001b-chunk-size-fine.md | chunking.chunk_overlap: 100 → 62, chunking.chunk_size: 800 → 500 | 90 | – | – | – | – | 0.905 (+0.027) | 0.659 (-0.039) | 2.20 (+0.28) | 0.00002 (-0.00115) | 77 (-2840) | 0.00 (-1.00) | 0.46 (-1.12) | 0.68 (-1.38) | 0.0014 | dev_000_baseline |
+| dev_001b_chunk700_retrieval | experiments/001b-chunk-size-fine.md | chunking.chunk_overlap: 100 → 88, chunking.chunk_size: 800 → 700 | 90 | – | – | – | – | 0.932 (+0.054) | 0.714 (+0.017) | 2.08 (+0.16) | 0.00002 (-0.00115) | 77 (-2839) | 0.00 (-1.00) | 0.48 (-1.10) | 0.54 (-1.53) | 0.0014 | dev_000_baseline |
+| dev_001b_chunk900_retrieval | experiments/001b-chunk-size-fine.md | chunking.chunk_overlap: 100 → 112, chunking.chunk_size: 800 → 900 | 90 | – | – | – | – | 0.932 (+0.054) | 0.771 (+0.074) | 1.97 (+0.05) | 0.00002 (-0.00115) | 77 (-2839) | 0.00 (-1.00) | 0.45 (-1.13) | 0.54 (-1.53) | 0.0014 | dev_000_baseline |
 | dev_002_structure_retrieval | experiments/002-chunk-method.md | chunking.max_chars: None → 1600, chunking.method: recursive → structure | 90 | – | – | – | – | 0.960 (+0.081) | 0.795 (+0.097) | 2.11 (+0.19) | 0.00002 (-0.00115) | 76 (-2840) | 0.00 (-1.00) | 0.48 (-1.10) | 0.53 (-1.54) | 0.0014 | dev_000_baseline |
