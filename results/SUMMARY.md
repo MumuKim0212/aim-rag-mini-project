@@ -1,6 +1,6 @@
 # 실험 결과 요약
 
-생성: 2026-10-21T11:45:10 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
+생성: 2026-10-21T12:33:49 · `python scripts/report.py`로 다시 만든다. 괄호는 기준(compare_to) 대비 차이.
 
 | 실험 | 카드 | 변경 | n | 정답 점수 | 완전 정답 | 대응 일치 | 인용 정확 | page_hit@5 | evid@5 | gold@5 | USD/문항 | 토큰/문항 | LLM 호출/문항 | p50 s | p90 s | 비용 USD | 기준 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -17,3 +17,5 @@
 | dev_002_structure_retrieval | experiments/002-chunk-method.md | chunking.max_chars: None → 1600, chunking.method: recursive → structure | 90 | – | – | – | – | 0.960 (+0.081) | 0.795 (+0.097) | 2.11 (+0.19) | 0.00002 (-0.00115) | 76 (-2840) | 0.00 (-1.00) | 0.48 (-1.10) | 0.53 (-1.54) | 0.0014 | dev_000_baseline |
 | dev_002b_structure900 | experiments/002b-answer-runs-900-and-structure.md | chunking.chunk_overlap: 100 → 112, chunking.chunk_size: 800 → 900, chunking.max_chars: None → 1600, chunking.method: recursive → structure | 90 | 0.756 (+0.033) | 57.8% (+1.1%) | 92.2% (+10.0%) | 91.9% (+10.8%) | 1.000 (+0.122) | 0.838 (+0.141) | 2.14 (+0.22) | 0.00106 (-0.00010) | 2622 (-294) | 1.00 | 1.55 (-0.03) | 1.88 (-0.19) | 0.0958 | dev_000_baseline |
 | dev_002b_structure900_retrieval | experiments/002b-answer-runs-900-and-structure.md | chunking.chunk_overlap: 100 → 112, chunking.chunk_size: 800 → 900, chunking.max_chars: None → 1600, chunking.method: recursive → structure | 90 | – | – | – | – | 1.000 (+0.122) | 0.838 (+0.141) | 2.14 (+0.22) | 0.00002 (-0.00115) | 77 (-2840) | 0.00 (-1.00) | 0.48 (-1.10) | 0.52 (-1.55) | 0.0014 | dev_000_baseline |
+| dev_004_bm25_retrieval | experiments/004-retrieval-method.md | chunking.chunk_overlap: 100 → 112, chunking.chunk_size: 800 → 900, chunking.max_chars: None → 1600, chunking.method: recursive → structure, retrieval.method: vector → bm25 | 90 | – | – | – | – | 0.878 (-0.122) | 0.732 (-0.106) | 1.59 (-0.54) | 0.00000 (-0.00106) | 0 (-2622) | 0.00 (-1.00) | 0.00 (-1.55) | 0.02 (-1.86) | 0.0000 | dev_002b_structure900 |
+| dev_004_hybrid_retrieval | experiments/004-retrieval-method.md | chunking.chunk_overlap: 100 → 112, chunking.chunk_size: 800 → 900, chunking.max_chars: None → 1600, chunking.method: recursive → structure, retrieval.method: vector → hybrid | 90 | – | – | – | – | 0.987 (-0.013) | 0.853 (+0.015) | 2.11 (-0.03) | 0.00002 (-0.00105) | 77 (-2545) | 0.00 (-1.00) | 0.49 (-1.06) | 0.74 (-1.13) | 0.0014 | dev_002b_structure900 |

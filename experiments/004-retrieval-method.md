@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 004: Retrieval method — vector vs BM25 vs Hybrid (H3)
 
-Status: planned
+Status: decided (retrieval stays vector; no variant passed the LLM-free gate, no answer run)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -43,19 +43,24 @@ Date: 2026-10-21
 | Config | evid@5 (dev) | Net vs chain (+/−) | Context chars |
 |---|---|---|---|
 | chain: vector | 0.838 | – | 2,700 |
-| bm25 | | | |
-| hybrid α=0.5 | | | |
+| bm25 | 0.732 | 12 up / 19 down, net −7 | 2,967 |
+| hybrid α=0.5 | 0.853 | 10 up / 7 down, net +3 | 3,034 |
 
-- Per set: _..._
-- H3 reading: _..._
-- Headroom: _..._
+Runs `dev_004_bm25_retrieval`, `dev_004_hybrid_retrieval` (2026-10-21, 74 dev questions with gold pages, indexes of the chain reused). Other numbers (vector / bm25 / hybrid): `page_hit@5` 1.000 / 0.878 / 0.986, `mrr` 0.927 / 0.770 / 0.906, `gold@5` 2.14 / 1.59 / 2.11. Questions with `evid@5` = 1: 47 / 42 / 50; with 0: 3 / 10 / 2. Search time p90: BM25 0.02 s, hybrid 0.75 s (query embedding included).
+
+- Per set, `evid@5` (vector / bm25 / hybrid): base_positive + 4 answerable base_negative (n=34) 0.962 / 0.798 / 0.951; life_guide (n=10) 0.744 / 0.651 / 0.796; additional (n=30) 0.729 / 0.684 / 0.762.
+- bm25 improved: POS026 POS054 POS070 POS074 ADD-RP05 ADD-RP06 ADD-HF05 ADD-HF06 ADD-SE03 ADD-SE06 ADD-PF08 ADD-PF09; worsened: POS017 POS044 POS047 POS045 POS050 POS051 POS058 POS059 NEG019 POS061 POS064 POS078 ADD-HP04 ADD-HP09 ADD-HP10 ADD-SE04 ADD-IN08 ADD-IN10 ADD-PF05.
+- hybrid improved: POS026 POS054 POS070 POS074 POS079 ADD-RP05 ADD-HF05 ADD-SE03 ADD-SE06 ADD-PF08; worsened: POS047 POS045 POS050 POS059 POS064 ADD-HF10 ADD-IN08.
+- H3 reading: **not supported.** BM25 − vector on the exact-term questions (`base_positive`) is −0.164, i.e. BM25 is clearly worse there, not better; on `additional` + `life_guide` it is also lower (0.676 vs 0.733). Hybrid is within 0.02 of the better method in both groups (0.951 vs 0.962; 0.771 vs 0.733), but that part alone does not rescue H3.
+- Gates: bm25 fails (−0.106, net −7). Hybrid fails (+0.015 < +0.03, net +3 < 5). Context cap holds for both (3,034 ≤ 4,050). No headroom check and no answer run (nothing passed).
 
 ## 6. Answer run (only if allowed)
 
-_..._
+Not run: no variant passed the LLM-free gate. LLM calls used: 0 (hybrid query embeddings 0.0014 USD).
 
 ## 7. Decision and notes
 
-- Decision: _..._
-- Why, with question IDs: _..._
-- What the criteria missed, if anything: _..._
+- Decision: **bm25 rejected; hybrid not adopted. Retrieval stays vector search (k=5).** The retrieval comparison PLAN.md §3.2 asks for is done at the retrieval level.
+- Why, with question IDs: the chain's glossary and terms chunks are short, title-prefixed units that the embedding already matches almost perfectly on term questions (`base_positive` 0.962); BM25 loses 12 questions the vector search gets right there and elsewhere (e.g. POS044 POS047 POS050 POS058 POS059) and wins 12 (POS026 POS054 POS070 POS074 ADD-RP05 ADD-RP06 ADD-HF05 ADD-HF06 ADD-SE03 ADD-SE06 ADD-PF08 ADD-PF09). Hybrid keeps the vector strengths and picks up some of BM25's wins (POS026 POS054 POS070 POS074 ADD-RP05 ADD-HF05 ADD-SE03 ADD-SE06 ADD-PF08) and raises the number of questions with all evidence in context from 47 to 50, but loses 7 and the gain (+0.015, 3 questions net) is below both bars.
+- Not tested: other `hybrid_alpha` values (pre-registered as not tuned), BM25 text with the title prefix, a different BM25 tokenizer. A hybrid that wins on dev by tuning alpha would be a pick among several tries on 74 questions.
+- What the criteria missed, if anything: nothing was changed after the results. The BM25 side differs from the vector side by more than the method (no title prefix, Kiwi morphemes), so "BM25 is worse" means this BM25 configuration.
