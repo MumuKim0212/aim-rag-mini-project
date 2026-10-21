@@ -1,0 +1,8 @@
+base: 007-flash36.yaml
+name: 001e_chunk950chain
+card: experiments/001e-chunk-950.md
+compare_to: dev_007_flash36
+description: "Final RAG chain with Recursive 950/119 (instead of 900/112) for the documents that structure units do not cover"
+chunking:
+  chunk_size: 950
+  chunk_overlap: 119
