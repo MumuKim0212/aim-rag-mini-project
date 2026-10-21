@@ -1,0 +1,7 @@
+base: 010-answer-v2.yaml
+name: 012_flash36_v4
+card: experiments/012-flash36-prompt-v4.md
+compare_to: dev_010_answerv2
+description: "Final chain with gemini-3.6-flash and answer prompt v4 (card 012)"
+answer:
+  prompt: prompts/answer_v4.md
