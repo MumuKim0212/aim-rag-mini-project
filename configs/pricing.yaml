@@ -14,4 +14,4 @@ models:
   gemini-3.6-flash:      {input: 0.75, output: 3.75, valid_until: 2026-12-31}   # 1.50 / 7.50 from 2027-01-01
   gemini-3.8-flash:      {input: 0.75, output: 3.75, valid_until: 2026-12-31}   # 1.50 / 7.50 from 2027-01-01
   gemini-embedding-2:    {input: 0.20}
-  gemini-embedding-001:  {input: 0.15}   # not on the official page; third-party listing — confirm before card 006
+  gemini-embedding-001:  {input: 0.15}   # not on the official page (rechecked 2026-10-21, card 006 review); third-party listing — price unconfirmed

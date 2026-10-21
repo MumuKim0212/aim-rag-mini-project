@@ -1,0 +1,8 @@
+base: 002-structure.yaml
+name: 010_struct1000
+card: experiments/010-chunking-combo.md
+description: Structure chunking for the glossary and the standard terms, Recursive 1000/125 for every other document and for terms articles longer than 1000 characters; vector k=5
+compare_to: dev_002_structure_all_retrieval
+chunking:
+  chunk_size: 1000
+  chunk_overlap: 125

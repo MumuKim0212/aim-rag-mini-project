@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 004: 검색 방식 — 벡터 / BM25 / Hybrid (구조 청킹 위)
 
-Status: rejected (게이트 불통과, 답변 실행 없음)
+Status: not adopted (게이트 불통과, 답변 실행 없음. bm25는 열세, hybrid는 잡음 안이라 결론 불가)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -70,6 +70,7 @@ dev 90문항 전체(evid@5 계산 74문항), `--retrieval-only`. 실험 이름 `
 - Headroom (`evalkit/headroom.py --metric evid@5 --noise 14`; 기준 점수는 `scripts/merge_grades.py`로 범위 A는 `dev_002_structure`, 범위 B는 `dev_000_baseline`의 채점을 합침)
   - hybrid: upside 9 (ADD-HF07 ADD-HF10 ADD-PF01 ADD-PF08 ADD-PF09 ADD-RP06 ADD-SE06 ADD-SE08 POS054), 이미 정답인데 오른 문항 3, risk 7 (ADD-HP04 ADD-IN08 POS045 POS050 POS058 POS059 POS079). upside − risk = **2** ≤ 14
   - bm25(참고): upside 11, risk 17, upside − risk = −6
+- 세트별 표는 정답 페이지가 있는 base_negative 4문항(NEG019, NEG020, NEG031, NEG033)을 싣지 않았다. 74문항 합계에는 들어 있다. 기준 evid@5는 4문항 모두 1.0이고, hybrid는 4문항 모두 같다. bm25는 NEG019 하나가 내렸다(1.0 → 0). 그래서 bm25의 세트별 내림 17문항(8 + 4 + 5)에 NEG019를 더하면 합계의 18문항이 된다
 - Gates passed? **no** — 6절은 비운다
 
 ## 6. Answer run (only if the gates passed)
@@ -78,7 +79,7 @@ dev 90문항 전체(evid@5 계산 74문항), `--retrieval-only`. 실험 이름 `
 
 ## 7. Decision and notes
 
-- Decision: **reject** — 벡터 검색을 유지한다(구조 청킹 + 벡터 k=5). 답변 실행 없음
+- Decision: **not adopted** — 벡터 검색을 유지한다(구조 청킹 + 벡터 k=5). 답변 실행 없음. bm25는 evid@5 −4, risk 17로 열세다. hybrid는 순증 +5, 95% CI [−0.027, +0.058]이 잡음 안이라 "효과 없음"이 아니라 "효과를 보이지 못함"이다(아래 "기준이 놓친 것" 참고)
 - Why, with question IDs:
   - Hybrid는 additional에서 evid@5를 0.612 → 0.691로 올렸지만(10문항 오름: ADD-HF07, HF10, IN01, PF01, PF08, PF09, RP06, SE03, SE06, SE08; 2문항 내림: ADD-HP04, ADD-IN08) base_positive에서 0.943 → 0.909로 내렸다(POS045, POS050, POS058, POS059 4문항). 합치면 순증 +5로 잡음 14 안이다
   - 1절의 예상은 방향이 틀렸다. "정확한 용어 질문은 BM25, 상황 서술형은 벡터"로 예상했는데 반대였다. BM25 단독은 용어·약관 문항(base_positive)에서 8문항을 내렸고(POS021, POS044, POS045, POS050, POS051, POS052, POS058, POS059; 오른 것은 POS054 하나), 상황 서술형 additional에서는 13문항이 올랐다(ADD-HF05, HF06, HF07, HF10, IN01, PF01, PF08, PF09, RP05, RP06, SE03, SE06, SE08; 내린 것은 ADD-HP04, HP06, HP10, IN08, PF06). 원인은 확인하지 않았다. 추측: 용어집 청크가 아주 짧아(평균 약 100자) BM25의 낱말 일치 점수가 안정적이지 않고, additional 문항은 문서 본문의 낱말을 질문에 풀어 쓴 경우가 많아 낱말 일치가 도움이 됐을 수 있다
@@ -87,4 +88,5 @@ dev 90문항 전체(evid@5 계산 74문항), `--retrieval-only`. 실험 이름 `
   - 세트별로 효과가 반대라 세트(질문 유형)에 따라 검색 방식을 고르면 이득이 있을 수 있다(additional에는 hybrid). 그러나 질문 유형을 미리 알 수 없고, 이 결과를 본 뒤 만든 규칙이라 이 카드의 판정에는 쓰지 않았다. 후속 카드가 필요하면 사전 등록으로 따로 해야 한다
   - 3절의 α(0.5) 조정은 하지 않았다. 다른 α가 더 나은지는 모른다
   - 질문마다 BM25 토큰(`있` 같은 의미 없는 어간이 들어간다)을 거르는 정도는 조정하지 않았다
+  - **게이트가 이 데이터에서 사실상 통과할 수 없는 크기였다** (2026-10-21 검토에서 확인, 3절은 고치지 않았다). 헤드룸 게이트는 upside − risk > 14인데, 기준에서 evid@5가 1 미만이고 정답 점수도 2 미만이라 올릴 여지가 있는 문항은 74문항 중 18개뿐이다. 위험 0으로 15개 이상을 고쳐야 통과한다. LLM-free 게이트(순증 > 14)도 근거가 일부만 들어온 33문항 중 15개 이상이 순증해야 한다. 그래서 "게이트 불통과"는 hybrid가 도움이 안 된다는 증거가 아니라 도움이 되더라도 이 기준으로는 확인할 수 없다는 뜻이다. 잡음 14는 답변 점수가 바뀐 문항 수이고, 게이트는 이를 검색 지표의 문항 수에 그대로 대었다. PROCESS.md 0절에 같은 내용을 적었다
 - 다음: 005 검색량(k=3 / 8, MMR). 기준은 구조 청킹 + 벡터 검색이다

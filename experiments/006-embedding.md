@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 006: 임베딩 모델 — gemini-embedding-2 대 gemini-embedding-001 (구조 청킹 + 벡터 검색 위)
 
-Status: rejected (게이트 불통과, 답변 실행 없음)
+Status: not adopted (게이트 불통과, 답변 실행 없음. 순증이 잡음 안이라 결론 불가)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -64,6 +64,7 @@ dev 90문항 전체(evid@5 계산 74문항), `--retrieval-only`. 실험 이름 `
 - Cost cap: 문맥 1.03배로 상한(1.5배) 안
 - LLM-free gate: 순증 +5 ≤ 14 → **불통과**
 - Headroom (`evalkit/headroom.py --metric evid@5 --noise 14`): upside 8 (ADD-HF07 ADD-IN10 ADD-SE04 ADD-SE06 ADD-SE08 POS047 POS054 POS061), 이미 정답인데 오른 문항 8, risk 9 (ADD-HP04 ADD-RP04 ADD-RP07 POS045 POS050 POS052 POS058 POS059 POS070). upside − risk = **−1** ≤ 14
+- 주의 (2026-10-21 검토): risk 목록의 ADD-RP04는 기준 점수가 `dev_000_baseline`(Recursive 검색)의 채점이라 구조 청킹 기준과 맞지 않는다(카드 002 7절). 빼면 risk 8, upside − risk = 0이다. 게이트(> 14)와 결론은 같다
 - Gates passed? **no** — 6절은 비운다
 
 ## 6. Answer run (only if the gates passed)
@@ -72,12 +73,13 @@ dev 90문항 전체(evid@5 계산 74문항), `--retrieval-only`. 실험 이름 `
 
 ## 7. Decision and notes
 
-- Decision: **reject** — `gemini-embedding-2`를 유지한다. 답변 실행 없음
+- Decision: **not adopted** — `gemini-embedding-2`를 유지한다. 답변 실행 없음. evid@5는 올랐지만(+0.053, 95% CI [−0.012, +0.125]) 순증이 잡음 안이고 risk가 upside와 비슷해서, `gemini-embedding-001`이 나쁘다는 증거도 좋다는 증거도 아니다("기각"이 아니라 "결론 불가")
 - Why, with question IDs:
   - 평균 evid@5는 올랐지만(0.789 → 0.843) 오른 문항과 내린 문항이 뒤섞여 순증이 +5로 잡음 14 안이고, 95% CI도 0을 포함한다. 정답을 못 맞히던 문항 중 오른 것은 8개(upside)이고, 정답을 맞히던 문항 중 내린 것이 9개(risk)여서 점수 개선을 기대할 수 없다
   - 세트별로 반대다: additional은 올랐고(11 / 4) base_positive는 내렸다(3 / 6: POS044 POS045 POS050 POS052 POS058 POS059). 카드 004의 BM25·Hybrid와 같은 패턴(additional 상승, 용어·약관 문항 하락)이다
   - 1절에서 "접두어(문서명)가 없어서 약관 문항에서 불리할 수 있다"고 추측했는데, base_positive에서 내린 문항이 더 많았다. 다만 접두어 유무를 모델과 분리하지 않았으므로 원인이 접두어인지 모델 자체인지는 모른다
 - What the criteria missed, if anything:
   - 접두어(문서명)와 모델을 분리하지 못했다(1절). 접두어가 영향이라면 `gemini-embedding-2`에서 접두어를 끈 설정이나 `gemini-embedding-001`에 문서명을 붙인 설정을 따로 비교해야 알 수 있다
-  - 단가 0.15 USD는 확인하지 못했다. 비용 비교는 이 값이 맞을 때만 의미가 있다. 이 결정은 품질 게이트에서 막혀 비용과 무관하다
-- 004·005·006의 공통 결과: 검색 구성(방식, 검색량, 임베딩)을 바꾼 변형 중 어느 것도 게이트를 통과하지 못했다. 최종 검색 구성은 **구조 청킹 + 벡터 검색 k=5 + `gemini-embedding-2`** 로 유지한다
+  - 단가 0.15 USD는 확인하지 못했다. 비용 비교는 이 값이 맞을 때만 의미가 있다. 이 결정은 품질 게이트에서 막혀 비용과 무관하다. 2026-10-21에 공식 가격 페이지(`ai.google.dev/gemini-api/docs/pricing`)를 다시 확인했으나 `gemini-embedding-2`(유료 0.20 USD/1M 토큰)만 있고 `gemini-embedding-001`은 없었다. 그래서 인덱스 비용 0.099 USD는 계속 추정치이고, 장부와 `configs/pricing.yaml`에 그대로 "미확인"으로 둔다
+  - **게이트 도달 가능성** (2026-10-21 검토, 3절은 고치지 않았다): 헤드룸 게이트(upside − risk > 14)는 올릴 여지가 있는 문항(기준에서 evid@5 < 1이고 점수 < 2)이 74문항 중 18개뿐이라 15개 이상을 위험 0으로 고쳐야 통과한다. LLM-free 게이트(순증 > 14)도 근거가 일부만 들어온 33문항 중 15개 이상이어야 한다. 이 카드의 불통과는 "임베딩 변경이 소용없다"가 아니라 "이 기준으로는 확인할 수 없다"는 뜻이다. PROCESS.md 0절 참고
+- 004·005·006의 공통 결과: 검색 구성(방식, 검색량, 임베딩)을 바꾼 변형 중 어느 것도 게이트를 통과하지 못했다(k=3, MMR, bm25는 기준보다 나빴고 hybrid와 gemini-embedding-001은 잡음 안, k=8은 비용 상한 초과). 최종 검색 구성은 **구조 청킹 + 벡터 검색 k=5 + `gemini-embedding-2`** 로 유지한다
