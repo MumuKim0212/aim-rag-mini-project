@@ -1,0 +1,7 @@
+base: 011-lite-v2.yaml
+name: 011c_lite_v4
+card: experiments/011-lite-answer-prompt.md
+compare_to: dev_011b_lite_v3
+description: "Final chain with gemini-3.5-flash-lite and answer prompt v4 (v3 with a narrowed refused rule; card 011, L3)"
+answer:
+  prompt: prompts/answer_v4.md

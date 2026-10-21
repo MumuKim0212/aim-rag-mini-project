@@ -48,3 +48,9 @@ Date: 2026-10-21
 - Score **0.822** (fully correct 64 of 90, status match 93.3%, citation on gold page 94.6%) against 0.861 / 69 for 3.6-flash (`dev_010_answerv2`). Paired: lite better 5 (NEG011 NEG037 POS070 POS074 POS078), 3.6-flash better 9 (ADD-HF10 ADD-HP10 ADD-IN08 NEG013 NEG039 POS044 POS047 POS054 POS061), 76 same; diff −0.039, CI [−0.089, +0.011]. Answer cost 0.42×, p90 latency 3.0 s.
 - Lite's 26 imperfect answers (read in full): (1) one dense paragraph that leaves out a part of the question or the evidence's conditions (POS047 POS054 POS059 POS061 POS066 POS076 ADD-HP09 ADD-HP10 ADD-HF10 ADD-IN04 ADD-PF01 ADD-PF08); (2) abstains or clarifies although part of the evidence is in context (POS044 ADD-IN08 ADD-SE06); (3) answers instead of asking for an unspecified account (NEG013 NEG014); (4) adds figures that are not in the results (POS050 "T+2", POS061 "50%"); (5) planned dates / proposals read as in force (NEG037 ADD-HF06).
 - `answer_v3.md` was written from these (frozen before its run, see the file header).
+
+### L2 `dev_011b_lite_v3` (lite + prompt v3; dev 90, 0 errors)
+
+- Score **0.844** (fully correct 67, status match 94.4%, citation on gold page 96.0%). Paired against L1: v3 better 8 (ADD-HF10 ADD-IN08 ADD-PF01 ADD-SE06 NEG037 NEG039 POS044 POS047), L1 better 4 (ADD-HF06 ADD-HP10 POS058 POS078), diff +0.022, CI [−0.022, +0.067], net +4. Against 3.6-flash v2: −0.017, CI [−0.067, +0.033], net −2. Answer cost 1.17× L1 (0.49× of 3.6-flash), p90 3.1 s.
+- By the choosing rule (net ≥ 5): +4 does not qualify; v3 is not chosen on its own.
+- General failure pattern in the v3 changes: the refusal rule, now first in the order, sent answerable questions to `refused` (POS078 scam-case question, NEG039, ADD-HP06) and the risk statement leaked into normal answers. `answer_v4.md` (v3 with a narrowed rule ① only) is the last allowed version.
