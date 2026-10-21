@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 002: Structure-unit chunking vs Recursive (H1)
 
-Status: planned
+Status: llm-free done (gates passed except headroom; answer run needs an explicit waiver from the project owner)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -49,21 +49,22 @@ Date: 2026-10-21
 | Config | Proxy metric (dev) | Net vs baseline (+/−) | Context chars / est. tokens |
 |---|---|---|---|
 | baseline | 0.697 | – | 3,064 |
-| structure | | | |
+| structure | 0.795 | 11 up / 1 down, net +10 | 2,512 |
 
-- Cut quotes: baseline _N_, structure _N_
-- Headroom: upside _N_ (_qids_), already correct among improved _N_, risk _N_ (_qids_)
-- Gates passed? _yes / no — if no, skip section 6 and decide in section 7_
+Run `dev_002_structure_retrieval` (2026-10-21, 74 dev questions with gold pages). Other numbers (baseline → structure): `page_hit@5` 0.878 → 0.959, `mrr` 0.800 → 0.901, `gold@5` 1.92 → 2.11. Questions with `evid@5` = 1: 34 → 42; with 0: 11 → 5. Chunks: scope A 309 → 633, scope B 1,212 → 1,536 (glossary median about 90 characters, terms median about 270).
+
+- Improved: POS001 POS006 POS013 POS017 POS021 POS044 POS047 POS050 POS052 POS057 POS058 (all four glossary misses POS001 POS006 POS013 POS021 are among them). Worsened: POS026. Questions outside `base_*` did not change.
+- Cut quotes (`scripts/chunk_stats.py`, dev, scope A + B): baseline 1 + 6 = 7, structure 0 + 6 = 6. The 6 in scope B (ADD-HF10 ADD-HP09 ADD-PF09 POS061 POS076 POS078) are in documents this experiment does not change.
+- Headroom (`evid@5`, noise 14): upside 9 (POS001 POS006 POS013 POS021 POS047 POS050 POS052 POS057 POS058), already correct among improved 2, risk 1 (POS026). Upside − risk = 8 ≤ 14.
+- Gates passed? LLM-free gate yes (+0.098, net +10, cut quotes 7 → 6), context cap yes (2,512 = 0.82× baseline), headroom gate **no** (8 ≤ 14). Section 6 is skipped.
 
 ## 6. Answer run (only if the gates passed)
 
-- Experiment name: _..._
-- Paired vs baseline: _B better N / A better N / same N, diff ±0.000, 95% CI [_, _]_
-- Tokens / latency vs baseline: _..._
-- LLM calls used: _answers __ + judge ___
+Not run (headroom gate). LLM calls used: 0. Embedding cost: index builds 0.138 USD, scopes A and B.
 
 ## 7. Decision and notes
 
-- Decision: _adopt / reject / inconclusive_
-- Why, with question IDs: _..._
-- What the criteria missed, if anything: _..._
+- Decision: **inconclusive for now, not adopted.** By the criteria above no answer run is allowed (CLAUDE.md: no batch LLM run without passed gates), so the structure chunking cannot enter the adopted chain by the "adopt if" rule. Whether to run the answer run anyway is a decision for the project owner (see below).
+- Why, with question IDs: retrieval clearly improves on the questions this method targets — 11 better, 1 worse (POS026), `evid@5` = 0 questions 11 → 5, with a smaller context. The headroom gate fails because only 9 improved questions are not already fully answered (the baseline answers POS017 and POS044 fully), and the rule needs more than 14. H1 is supported at the retrieval level for glossary and terms documents only; it is not tested for the guide documents (not implemented) and not tested at the answer level.
+- Not investigated: why POS026 got worse (the glossary lists "공매도" twice, dicId 1859 and 1865, with the same definition — POS026 and POS043 ask about it; I did not check whether two near-identical chunks take two of the five slots).
+- What the criteria missed, if anything: nothing was changed after the results. The headroom bar of 14 is as high as the answer-level noise, and this change can touch at most the 34 `base_*` questions, so even a clean retrieval gain would not pass it. A waiver, if given, must be recorded here with the date and who gave it, and the answer run must use a new experiment name.

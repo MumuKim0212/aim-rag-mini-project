@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 001: Chunk size 400 / 800 / 1200
 
-Status: planned
+Status: decided (no answer run: 400 failed the LLM-free gate, 1200 failed the headroom gate)
 Date: 2026-10-21
 
 ## 1. Hypothesis
@@ -47,21 +47,22 @@ Applied to each variant separately against the baseline.
 | Config | Proxy metric (dev) | Net vs baseline (+/−) | Context chars / est. tokens |
 |---|---|---|---|
 | baseline (800/100) | 0.697 | – | 3,064 |
-| 400/50 | | | |
-| 1200/150 | | | |
+| 400/50 | 0.675 | 9 up / 19 down, net −10 | 1,670 |
+| 1200/150 | 0.748 | 18 up / 8 down, net +10 | 4,166 |
 
-- Headroom: upside _N_ (_qids_), already correct among improved _N_, risk _N_ (_qids_)
-- Gates passed? _yes / no — if no, skip section 6 and decide in section 7_
+Runs `dev_001_chunk400_retrieval`, `dev_001_chunk1200_retrieval` (2026-10-21, 74 dev questions with gold pages). Other retrieval numbers (baseline → 400 → 1200): `page_hit@5` 0.878 → 0.905 → 0.905, `mrr` 0.800 → 0.835 → 0.803, `gold@5` 1.92 → 2.49 → 1.80. Questions with `evid@5` = 1: 34 → 28 → 42; with 0: 11 → 10 → 10. Chunks (scope A / B): 309 / 1,212 → 567 / 2,207 → 219 / 880. Dev quotes cut by chunking (`scripts/chunk_stats.py`, scope A / B): 1 / 6 → 16 / 33 → 2 / 2.
+
+- 400 improved: POS052 POS057 POS061 POS064 ADD-HF05 ADD-HF10 ADD-SE04 ADD-SE03 ADD-SE06. Worsened: POS022 POS026 POS038 POS045 POS047 POS050 POS058 NEG019 POS066 POS078 POS079 ADD-HP04 ADD-HP10 ADD-RP04 ADD-RP07 ADD-RP06 ADD-HF06 ADD-PF01 ADD-PF06.
+- 1200 improved: POS001 POS021 POS044 POS047 POS058 POS057 POS074 POS078 ADD-HP09 ADD-HP10 ADD-HF10 ADD-SE03 ADD-IN01 ADD-SE08 ADD-PF01 ADD-IN10 ADD-PF08 ADD-PF06. Worsened: POS050 NEG019 POS061 ADD-RP05 ADD-HF05 ADD-HF07 ADD-HF06 ADD-IN08.
+- Headroom (`evid@5`, noise 14), 1200 only (400 failed the LLM-free gate): upside 12 (ADD-HF10 ADD-HP09 ADD-IN10 ADD-PF01 ADD-PF08 ADD-SE08 POS001 POS021 POS047 POS057 POS058 POS078), already correct among improved 6, risk 7 (ADD-HF05 ADD-HF07 ADD-IN08 ADD-RP05 NEG019 POS050 POS061). Upside − risk = 5 ≤ 14.
+- Gates passed? 400: no (`evid@5` −0.022, net −10). 1200: LLM-free gate yes (+0.051, net +10), context cap yes (4,166 ≤ 4,596), headroom gate no (5 ≤ 14). Section 6 is skipped.
 
 ## 6. Answer run (only if the gates passed)
 
-- Experiment name: _..._
-- Paired vs baseline: _B better N / A better N / same N, diff ±0.000, 95% CI [_, _]_
-- Tokens / latency vs baseline: _..._
-- LLM calls used: _answers __ + judge ___
+Not run (gates in section 5). LLM calls used: 0. Embedding cost: index builds 0.142 USD (400) and 0.138 USD (1200), scopes A and B.
 
 ## 7. Decision and notes
 
-- Decision: _adopt / reject / inconclusive_
-- Why, with question IDs: _..._
-- What the criteria missed, if anything: _..._
+- Decision: **400/50 rejected. 1200/150 not adopted (inconclusive: no answer run).** The baseline stays 800/100.
+- Why, with question IDs: 400 loses evidence — 19 questions worse against 9 better, and 16 of 59 scope-A dev quotes are cut by the chunk boundaries (baseline 1). 1200 keeps evidence together (cut quotes 2 / 2) and raises `evid@5` for 18 questions, but 8 get worse (POS050 NEG019 POS061 ADD-RP05 ADD-HF05 ADD-HF07 ADD-HF06 ADD-IN08), 6 of the 18 gains are on questions the baseline already answered fully, and the context is 36% longer (4,166 vs 3,064 characters), so part of the gain is just more text. Upside − risk = 5 is not above the answer-level noise of 14, so an answer run could not show a gain by the rule of workflow step 6.
+- What the criteria missed, if anything: nothing was changed after the results. For the record, the headroom bar (more than 14 of 74 questions) is high for any single retrieval change, so a real small gain would also be reported as "cannot show a gain". The 1200 result is retrieval evidence only; it says nothing about answer quality.
