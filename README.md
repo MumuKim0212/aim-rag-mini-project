@@ -20,7 +20,7 @@
 ├── experiments/         # 실험 카드 (판단 기준을 결과보다 먼저 작성)
 ├── configs/             # baseline.yaml, 변형 설정, pricing.yaml (단가는 여기에만)
 ├── prompts/             # 답변·채점 프롬프트 (버전별 파일)
-├── src/rag/             # 파이프라인 코드: 공통 기반(구현됨) + 문서 처리·청킹·검색·RAG·Agent·채점(구현할 부분)
+├── src/rag/             # 파이프라인 코드: 공통 기반 + 문서 처리·청킹·검색(Hybrid, rerank)·RAG·Agent·채점
 ├── scripts/             # 실행 진입점: build_index, run, grade, evaluate, compare, report
 ├── tests/               # 공통 기반 테스트 (python -m pytest)
 ├── evalkit/             # 실행 기록·지표·비교 도구 (표준 라이브러리만)
