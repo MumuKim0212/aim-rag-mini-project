@@ -4,11 +4,16 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from lab.common import ROOT, SETS, SYSTEMS, final_frame, final_stats
+from lab.common import ROOT, SETS, SYSTEMS, final_frame, final_stats, picked_compare, picked_note, picked_runs
 
 st.title("🏁 최종 test 결과")
 st.caption("네 시스템을 test 전에 고정하고(PROCESS.md 9절) test 131문항(제공 90 + 자작 v2 41)에서 한 번씩 실행한 결과입니다. "
            "test 세트는 다시 돌리지 않습니다.")
+picked_note()
+if picked_runs():
+    picked_compare("선택한 agent 비교와 한 줄 요약 (dev 문항)")
+    st.caption("agent 비교는 dev 문항 결과입니다(test는 최종 결정 뒤 다시 쓰지 않는 규칙). 아래 T1~T4는 test 결과입니다.")
+    st.divider()
 
 st.markdown("""
 | | 시스템 | 설정 |

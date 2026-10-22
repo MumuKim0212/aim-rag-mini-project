@@ -1,15 +1,17 @@
 import altair as alt
 import streamlit as st
 
-from lab.common import LABELS, summary_table
+from lab.common import picked_note, summary_table
 
 st.title("📈 점수 변화")
-st.caption("답변까지 채점한 dev 실험을 실행한 순서대로 놓았습니다. 실험마다 한 요소만 바꿨고, 채택된 변경이 다음 실험의 기준이 됩니다.")
+st.caption("답변까지 채점한 dev 실험을 실행한 순서대로 놓았습니다. 실험마다 한 요소만 바꿨고, 채택된 변경이 다음 실험의 기준이 됩니다. "
+           "agent_list에서 고른 agent의 실행(🤖)도 실행 시각 순서에 함께 놓입니다.")
+picked_note()
 
 t = summary_table()
 d = t[(t["split"] == "dev") & t["정답 점수"].notna()].sort_values("만든 시각").reset_index(drop=True)
 d["순서"] = d.index + 1
-d["표시"] = d["실험"].map(lambda e: LABELS.get(e, ""))
+d["표시"] = d["이름"].fillna("")
 
 metric = st.radio("지표", ["정답 점수", "완전 정답률", "대응 일치율", "출처 일치율"], horizontal=True)
 base = alt.Chart(d).encode(x=alt.X("순서:Q", title="실행 순서"), tooltip=["실험", "설명", metric, "USD/문항", "p90 초"])

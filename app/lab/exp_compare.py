@@ -2,15 +2,18 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from lab.common import SETS, golden, graded, label, paired, rows, summary
+from lab.common import SETS, golden, graded, label, paired, picked_note, picked_runs, rows, summary
 
 st.title("⚖️ 두 실험 짝비교")
-st.caption("같은 문항을 두 실험이 각각 몇 점 받았는지 문항별로 짝지어 비교합니다(`scripts/compare.py`와 같은 계산).")
+st.caption("같은 문항을 두 실험이 각각 몇 점 받았는지 문항별로 짝지어 비교합니다(`scripts/compare.py`와 같은 계산). "
+           "agent_list에서 고른 agent(🤖)는 목록 맨 앞에 있습니다.")
+picked_note()
 
 split = st.radio("split", ["dev", "test"], horizontal=True)
-names = graded(split)
-default_a = "dev_013_rerank_flash36_fix" if split == "dev" else "test_013_rerank_flash36"
-default_b = "dev_008b_agent950" if split == "dev" else "test_008b_agent950"
+mine = [r["experiment"] for r in picked_runs()] if split == "dev" else []
+names = mine + [e for e in graded(split) if e not in mine]
+default_a = mine[0] if len(mine) >= 2 else ("dev_013_rerank_flash36_fix" if split == "dev" else "test_013_rerank_flash36")
+default_b = mine[1] if len(mine) >= 2 else ("dev_008b_agent950" if split == "dev" else "test_008b_agent950")
 c1, c2 = st.columns(2)
 a = c1.selectbox("기준 (A)", names, index=names.index(default_a) if default_a in names else 0, format_func=label)
 b = c2.selectbox("비교 (B)", names, index=names.index(default_b) if default_b in names else 1, format_func=label)

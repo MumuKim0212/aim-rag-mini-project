@@ -1,10 +1,12 @@
 import pandas as pd
 import streamlit as st
 
-from lab.common import SYSTEMS, final_stats, kpi_row, summary_table
+from lab.common import SYSTEMS, final_stats, kpi_row, picked_compare, picked_note, summary_table
 
 st.title("🏠 금융 문서 RAG 실습 한눈에 보기")
 st.caption("금융 PDF 23개를 검색해 근거(파일·페이지)와 함께 답하는 RAG와 Agent를 만들고, 직접 만든 평가 루프로 개선한 실습의 결과입니다.")
+picked_note()
+picked_compare("선택한 agent 한눈에 비교 (dev)")
 
 stats = {k: final_stats(k) for k in SYSTEMS}
 st.subheader("최종 결과 (test 131문항: 제공 90 + 자작 41)")

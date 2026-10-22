@@ -1,12 +1,16 @@
 import streamlit as st
 
-from lab.common import agent_of, show_mermaid
+from lab.common import agent_of, picked, picked_note, show_mermaid
 
 import agent as A  # noqa: E402  (repo root agent.py: Korean names for nodes and branches)
 
 st.title("🧭 에이전트 흐름도")
 st.caption("LangGraph가 컴파일한 그래프(`graph.get_graph()`)에서 바로 그린 그림입니다. 노드와 분기 이름만 한글로 바꿨으므로 "
            "코드가 바뀌면 그림도 같이 바뀝니다. API는 쓰지 않습니다.")
+picked_note()
+if picked():
+    st.page_link("lab/langgraph.py", label="🤖 선택한 agent들의 흐름도는 '1. 데이터 › langgraph'에서 나란히 봅니다", icon="🧭")
+st.caption("아래는 이 저장소(현재 브랜치)에 있는 에이전트 세 가지입니다.")
 
 AGENTS = {
     "T3 에이전트 (세린님, 최종 test에 사용)": ("configs/008b-agent-950.yaml",

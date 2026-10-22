@@ -1,14 +1,17 @@
 import pandas as pd
 import streamlit as st
 
-from lab.common import SETS, STATUS, golden, graded, label, rows
+from lab.common import SETS, STATUS, golden, graded, label, picked_note, picked_runs, rows
 
 st.title("🔎 문항 하나씩 보기")
-st.caption("실험 하나를 고르고 문항별로 질문·기준 답·시스템 답·채점 이유·검색된 청크·에이전트 판단을 봅니다.")
+st.caption("실험 하나를 고르고 문항별로 질문·기준 답·시스템 답·채점 이유·검색된 청크·에이전트 판단을 봅니다. "
+           "agent_list에서 고른 agent(🤖)는 목록 맨 앞에 있고, 아래에 같은 문항의 다른 agent 답도 나옵니다.")
+picked_note()
 
 split = st.radio("split", ["dev", "test"], horizontal=True)
-names = graded(split)
-default = "dev_008b_agent950" if split == "dev" else "test_013b_rerank_lite"
+mine = [r["experiment"] for r in picked_runs()] if split == "dev" else []
+names = mine + [e for e in graded(split) if e not in mine]
+default = mine[0] if mine else ("dev_008b_agent950" if split == "dev" else "test_013b_rerank_lite")
 exp = st.selectbox("실험", names, index=names.index(default) if default in names else 0, format_func=label)
 
 items = golden()
@@ -90,3 +93,15 @@ if run.get("searches"):
 if steps.get("calls"):
     with st.expander("LLM·임베딩 호출"):
         st.dataframe(pd.DataFrame(steps["calls"]), width="stretch", hide_index=True)
+
+others = []
+for r in picked_runs():
+    orun = {x["qid"]: x for x in rows(r["experiment"], "runs.jsonl")}
+    ogr = {x["qid"]: x for x in rows(r["experiment"], "grades.jsonl")}
+    if qid in orun:
+        others.append({"agent": r["name"], "점수": ogr.get(qid, {}).get("correctness"),
+                       "상태": STATUS.get(orun[qid]["status"], orun[qid]["status"]), "LLM 호출": orun[qid].get("n_llm_calls"),
+                       "검색": orun[qid].get("n_searches"), "답변": orun[qid]["answer"][:300]})
+if others:
+    st.markdown("#### 🤖 같은 문항, 선택한 agent별 점수와 답")
+    st.dataframe(pd.DataFrame(others), width="stretch", hide_index=True)

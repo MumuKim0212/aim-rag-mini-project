@@ -4,14 +4,19 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from lab.common import SETS, has, label, paired, rows, summary
+from lab.common import SETS, has, label, paired, picked_compare, picked_note, picked_runs, rows, summary
 
-st.title("🤖 에이전트 비교 (dev 90문항)")
-st.caption("같은 청킹·검색·답변 모델 위에서 그래프만 다른 에이전트들을 비교합니다. 기준은 같은 체인의 RAG(T2)입니다.")
+st.title("🤖 에이전트 비교")
+st.caption("위: agent_list에서 고른 agent끼리 같은 문항으로 비교. 아래: 저장소에 있는 dev 90문항 결과(같은 체인의 RAG T2 대비).")
+picked_note()
+picked_compare("선택한 agent끼리 비교 (dev)")
+st.divider()
+st.subheader("저장소의 dev 90문항 결과 (+ 선택한 agent)")
 
 CANDIDATES = ["dev_013_rerank_flash36_fix", "dev_008b_agent950", "dev_014_agent_v2"]
-extra = st.text_input("다른 팀원 에이전트 실험 이름 추가 (쉼표로 구분, results/ 에 있어야 함)", "")
-names = CANDIDATES + [e.strip() for e in extra.split(",") if e.strip() and has(e.strip(), "grades.jsonl")]
+extra = st.text_input("다른 실험 이름 추가 (쉼표로 구분, results/ 에 있어야 함)", "")
+names = (CANDIDATES + [r["experiment"] for r in picked_runs()]
+         + [e.strip() for e in extra.split(",") if e.strip() and has(e.strip(), "grades.jsonl")])
 
 
 def run_stats(exp: str) -> dict:

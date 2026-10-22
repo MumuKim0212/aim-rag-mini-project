@@ -2,13 +2,12 @@ import os
 
 import streamlit as st
 
-from lab.common import ROOT, agent_of, golden, show_mermaid
-
-import agent as A  # noqa: E402
+from lab.common import A, BA, ROOT, agent_of, golden, picked, picked_note, show_mermaid
 
 st.title("▶️ 질문 직접 실행")
 st.caption("에이전트에 질문 하나를 넣고, 지나간 노드와 판단을 한글로 봅니다. **API를 사용합니다** "
            "(질문 1개에 LLM 4~6회, 약 0.01~0.02 USD). dev 문항이나 직접 쓴 질문만 실행합니다.")
+picked_note()
 
 from rag.env import setup  # noqa: E402
 
@@ -17,11 +16,15 @@ if not os.environ.get("GOOGLE_API_KEY"):
     st.error("GOOGLE_API_KEY가 없습니다. 프로젝트 폴더의 .env에 키를 넣어야 실행할 수 있습니다.")
     st.stop()
 
-MODES = {"복구 에이전트 (카드 015)": "configs/015-context-repair.yaml", "T3 에이전트": "configs/008b-agent-950.yaml"}
+# picked agents run with their own branch code (a checkout under out/agent_runs/); the two local ones in-process
+MODES = {f"🤖 {n}. {a['label']}": ("branch", a) for n, a in enumerate(picked(), 1)}
+MODES |= {"복구 에이전트 (이 브랜치, 카드 015)": ("local", "configs/015-context-repair.yaml"),
+          "T3 에이전트 (이 브랜치)": ("local", "configs/008b-agent-950.yaml")}
 c1, c2 = st.columns([1, 2])
 mode = c1.radio("에이전트", list(MODES))
 how = c2.radio("질문", ["dev 골드셋 문항", "직접 쓰기"], horizontal=True)
-ag, cfg = agent_of(MODES[mode])
+kind, what = MODES[mode]
+cfg = agent_of(what)[1] if kind == "local" else agent_of("configs/008b-agent-950.yaml")[1]  # scopes are the same
 
 from rag.golden import scope_of  # noqa: E402
 
@@ -39,14 +42,37 @@ else:
 if not (ROOT / "out" / "index").exists():
     st.warning("out/index 에 인덱스가 없습니다. 먼저 `python scripts/build_index.py --config configs/015-context-repair.yaml`")
 
+
+@st.cache_data(show_spinner=False)
+def branch_graph(sha: str, config: str) -> str:
+    return BA.graph_of(sha, config)
+
+
+def graph(mode_: str, path: list[str]) -> str:
+    kind_, what_ = MODES[mode_]
+    if kind_ == "local":
+        return A.korean_mermaid(agent_of(what_)[0], path=path)
+    return A.translate(branch_graph(what_["sha"], what_["config"]), path)
+
+
 if st.button("실행", type="primary", disabled=not question.strip()):
-    with st.spinner("에이전트 실행 중… (10~30초)"):
-        result = A.run_question(ag, cfg, question, scope)
+    with st.spinner("에이전트 실행 중… (10~40초)"):
+        if kind == "local":
+            result = A.run_question(agent_of(what)[0], cfg, question, scope)
+        else:
+            try:
+                result = BA.live_run(what["sha"], what["config"], question, scope)
+            except Exception as e:
+                st.error(f"실행 실패: {str(e)[-400:]}")
+                st.stop()
+            from rag import cost
+            result["seconds"] = result.get("latency_s")
+            result["usd"] = cost.totals(result["steps"]["calls"], cost.load_prices())["usd"]
     st.session_state["live"] = (result, item, mode)
 
-if "live" in st.session_state:
+if "live" in st.session_state and st.session_state["live"][2] in MODES:
     result, item_, mode_ = st.session_state["live"]
-    st.subheader(f"결과: {A.STATUS.get(result['status'], result['status'])}")
+    st.subheader(f"결과 ({mode_}): {A.STATUS.get(result['status'], result['status'])}")
     k = st.columns(4)
     k[0].metric("LLM 호출", result["n_llm_calls"])
     k[1].metric("검색", result["n_searches"])
@@ -69,7 +95,7 @@ if "live" in st.session_state:
                             f"인용 **{'함' if key in cited else '안 함'}**")
     with right:
         st.markdown("**지나간 노드 (노란색)**")
-        show_mermaid(A.korean_mermaid(agent_of(MODES[mode_])[0], path=A.visited_path(result["steps"])))
+        show_mermaid(graph(mode_, A.visited_path(result["steps"])))
     with st.expander(f"답변 단계에 넘어간 문맥 ({len(result['context'])}개)"):
         for n, u in enumerate(result["context"], 1):
             st.markdown(f"**[{n}] {u['source']} p.{u['page']}** · `{u['chunk_id']}`")

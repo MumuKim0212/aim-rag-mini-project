@@ -2,10 +2,32 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from lab.common import ROOT, kpi_row, pages
+from pathlib import Path
+
+from lab.common import ROOT, jsonl, kpi_row, pages, picked, picked_note, picked_runs, summary
 
 st.title("✂️ 청킹 방식별 청크")
 st.caption("같은 페이지 텍스트를 청킹 방식마다 어떻게 나누는지 비교합니다. 코드로 바로 청킹하므로 API를 쓰지 않습니다.")
+picked_note()
+if picked():
+    st.subheader("🤖 선택한 agent의 청킹·검색 설정")
+    runs = {r["label"]: r for r in picked_runs()}
+    rows_ = []
+    for n, a in enumerate(picked(), 1):
+        ch, r = a["chunking"], runs.get(a["label"])
+        used = {}
+        if r:
+            for run in jsonl(str(Path(r["path"]) / "runs.jsonl")):
+                for u in run.get("context") or []:
+                    used[u["chunk_id"]] = len(u["content"])
+        rt = (summary(r["experiment"]).get("config") or {}).get("retrieval", {}) if r else {}
+        rows_.append({"agent": f"{n}. {a['label']}", "방식": ch.get("method"), "크기/겹침": f"{ch.get('chunk_size')}/{ch.get('chunk_overlap')}",
+                      "조항 최대 글자": ch.get("max_chars"), "머리말": ch.get("add_header", False), "검색": rt.get("method", "–"),
+                      "k / 재정렬 후보": f"{rt.get('k', '–')} / {rt.get('rerank_pool') or '–'}",
+                      "답에 쓴 조각": len(used) or None, "그 조각 평균 길이": round(sum(used.values()) / len(used)) if used else None})
+    st.dataframe(pd.DataFrame(rows_), hide_index=True, width="stretch")
+    st.caption("설정은 각 agent 브랜치의 config 파일 값이고, '답에 쓴 조각'은 그 agent의 dev 실행에서 답변 단계에 넘어간 조각입니다.")
+    st.divider()
 
 CHUNKERS = {
     "처음 기준: Recursive 800/100": "configs/baseline.yaml",
