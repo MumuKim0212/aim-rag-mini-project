@@ -24,8 +24,8 @@ from rag.cost import call_usd, load_prices  # noqa: E402
 from rag.golden import load_golden  # noqa: E402
 from rag.retrieval import index_dir  # noqa: E402
 
-CFG_LITE = "configs/013b-rerank-lite.yaml"      # recommended: gemini-3.5-flash-lite + prompt v4 + rerank
-CFG_FLASH = "configs/013-rerank-flash36.yaml"   # measured on the test split (T2): gemini-3.6-flash
+CFG_LITE = "configs/013b-rerank-lite.yaml"      # final system (T4): gemini-3.5-flash-lite + prompt v4 + rerank
+CFG_FLASH = "configs/013-rerank-flash36.yaml"   # T2: gemini-3.6-flash
 CFG_AGENT = "configs/008b-agent-950.yaml"
 CFG_BASE = "configs/baseline.yaml"
 RESULTS = ROOT / "results"
@@ -103,6 +103,31 @@ def score(exp: str, key: str = "correctness_mean"):
     return s["scores"].get(key) if s else None
 
 
+# final comparison: provided test 90 + self-written set 41 = 131 questions (the first 20-question draft is dropped)
+FINAL = {"T1": ["test_000_baseline", "test_000_baseline_self2"], "T2": ["test_013_rerank_flash36", "test_013_rerank_flash36_self2"],
+         "T3": ["test_008b_agent950", "test_008b_agent950_self2"], "T4": ["test_013b_rerank_lite"]}
+
+
+@st.cache_data
+def final_rows(system: str) -> list[dict]:
+    keep = {i["qid"] for i in load_golden() if i["set"] != "self"}
+    rows = {}
+    for exp in FINAL[system]:
+        for m in jsonl(str(RESULTS / exp / "metrics.jsonl")):
+            if m["qid"] in keep:
+                rows[m["qid"]] = m
+    return list(rows.values())
+
+
+def final_stats(system: str) -> dict:
+    r = final_rows(system)
+    if not r:
+        return {}
+    lat = sorted(m["latency_s"] for m in r)
+    return {"n": len(r), "score": sum(m["correctness"] for m in r) / len(r) / 2, "full": sum(m["correctness"] == 2 for m in r) / len(r),
+            "usd": sum(m["usd"] for m in r) / len(r), "p90": lat[int(0.9 * (len(lat) - 1))]}
+
+
 # ---------------------------------------------------------------- 0. overview
 def page_overview():
     st.title("📚 금융 문서 질의응답 시스템")
@@ -121,12 +146,13 @@ def page_overview():
             card(t, b)
     st.divider()
     st.subheader("결과 한눈에 보기")
-    t1, t2, t3 = score("test_000_baseline"), score("test_013_rerank_flash36"), score("test_008b_agent950")
+    f = {k: final_stats(k) for k in FINAL}
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("처음 시스템 점수", f"{t1:.2f}" if t1 else "-", help="최종 시험(110문항) 정답 점수, 0~1")
-    m2.metric("개선한 시스템 점수", f"{t2:.2f}" if t2 else "-", f"+{t2 - t1:.2f}" if t1 and t2 else None)
-    m3.metric("Agent 구조 점수", f"{t3:.2f}" if t3 else "-", f"+{t3 - t2:.2f} (오차 범위)" if t2 and t3 else None, delta_color="off")
-    m4.metric("권장 설정의 문항당 비용", "약 0.0035달러", help="gemini-3.5-flash-lite + 프롬프트 v4 + rerank, 개발용 90문항 기준")
+    if all(f.values()):
+        m1.metric("처음 시스템 점수", f'{f["T1"]["score"]:.2f}', help="최종 시험(131문항) 정답 점수, 0~1")
+        m2.metric("큰 모델 개선판 점수", f'{f["T2"]["score"]:.2f}', f'+{f["T2"]["score"] - f["T1"]["score"]:.2f}')
+        m3.metric("★ 최종 시스템(작은 모델) 점수", f'{f["T4"]["score"]:.2f}', f'{f["T4"]["score"] - f["T2"]["score"]:+.2f} (큰 모델 대비)', delta_color="off")
+        m4.metric("최종 시스템의 문항당 비용", f'{f["T4"]["usd"]:.4f}달러', f'큰 모델은 {f["T2"]["usd"]:.4f}달러', delta_color="off", help="최종 시험 131문항 평균")
     st.markdown('<div class="note"><b>읽는 법</b> 점수는 정답 0점·부분 1점·정답 2점을 평균해 0~1로 만든 값입니다. '
                 '같은 설정을 다시 돌리면 90문항 중 약 14문항의 답이 달라지므로 0.02 정도의 차이는 의미가 없습니다.</div>',
                 unsafe_allow_html=True)
@@ -185,7 +211,7 @@ def page_flow():
         ("조각으로 자르기", "용어집은 용어 하나, 약관은 조 하나를 한 조각으로 둡니다. 정의 하나가 반으로 잘리면 검색에서 놓치기 때문입니다. 가이드북과 보고서는 950자씩 자르고 앞뒤 119자를 겹칩니다. AI를 쓰지 않는 규칙입니다.", "구조 단위 + Recursive 950/119"),
         ("후보 15개 찾기", "‘뜻이 비슷한’ 조각(벡터 검색)과 ‘같은 단어가 있는’ 조각(BM25)을 절반씩 섞어 15개를 꺼냅니다. 한쪽만 쓰면 놓치는 것이 달랐기 때문입니다.", "gemini-embedding-2 + BM25"),
         ("AI가 5개 고르기 (rerank)", "15개를 AI가 읽고 질문에 답하는 데 필요한 5개만 고릅니다. 이 단계가 점수를 가장 크게 올렸습니다(근거를 찾는 비율 0.86 → 0.94).", "답변 모델이 직접 고름"),
-        ("답하기", "고른 5개만 근거로 답합니다. 근거가 없으면 보류, 질문이 모호하면 되묻기, 해서는 안 되는 요청이면 거절합니다. 출처 번호는 코드가 파일·쪽으로 바꿔 붙입니다.", "gemini-3.5-flash-lite (권장) + 프롬프트 v4"),
+        ("답하기", "고른 5개만 근거로 답합니다. 근거가 없으면 보류, 질문이 모호하면 되묻기, 해서는 안 되는 요청이면 거절합니다. 출처 번호는 코드가 파일·쪽으로 바꿔 붙입니다.", "gemini-3.5-flash-lite (최종) + 프롬프트 v4"),
     ]
     for i, (t, body, tech) in enumerate(steps, 1):
         with st.expander(f"{i}. {t}", expanded=(i == 4)):
@@ -231,7 +257,7 @@ def page_history():
                 '그 흔들림을 확실히 이긴 개선은 <b>‘AI가 5개 고르기(rerank)’</b> 하나였습니다.</div>', unsafe_allow_html=True)
     st.subheader("작은 모델(3.5 flash lite)로 낮췄을 때")
     lite = [("작은 모델 + 규칙 v2", "dev_011_lite_v2"), ("+ 규칙 v3", "dev_011b_lite_v3"), ("+ 규칙 v4", "dev_011c_lite_v4"),
-            ("+ rerank (권장)", "dev_013b_rerank_lite_fix")]
+            ("+ rerank (최종)", "dev_013b_rerank_lite_fix")]
     cols = st.columns(4)
     for col, (n, e) in zip(cols, lite):
         col.metric(n, f"{score(e):.3f}" if score(e) else "-")
@@ -314,7 +340,7 @@ def page_live():
     with c1:
         pick = st.selectbox("예시 질문", ["(직접 입력)"] + list(ex))
     with c2:
-        mode = st.radio("시스템", ["권장: 작은 모델 + rerank", "큰 모델 3.6 flash + rerank", "Agent 구조"], horizontal=False)
+        mode = st.radio("시스템", ["최종: 작은 모델 + rerank", "큰 모델 3.6 flash + rerank", "Agent 구조"], horizontal=False)
     item = dev[ex[pick]] if pick in ex else None
     question = st.text_input("질문", value=item["question"] if item else "", placeholder="예: 휴면성 증권계좌는 어떤 계좌인가요?")
     if not st.button("▶ 이 질문으로 실행", type="primary") or not question.strip():
@@ -334,7 +360,7 @@ def page_live():
     else:
         from rag.rag import format_answer, generate_answer, map_citations
         from rag.rerank import rerank
-        system = system_of(CFG_LITE if mode.startswith("권장") else CFG_FLASH)
+        system = system_of(CFG_LITE if mode.startswith("최종") else CFG_FLASH)
         cfg, steps = system.cfg, {"calls": []}
         st.markdown(f"모델: `{cfg['answer']['model']}`")
         with st.container(border=True):
@@ -366,41 +392,44 @@ def page_live():
 # ---------------------------------------------------------------- 5. final test
 def page_test():
     st.title("🏁 최종 시험 결과")
-    st.write("시험 문항 90개(제공) + 직접 만든 20개 = **110문항**을 세 시스템에 한 번씩만 풀게 했습니다. 시험 문제로 시스템을 고치지 않았습니다.")
-    systems = [("처음 시스템 (T1)", "test_000_baseline", "고정 800자 · 벡터 검색 · 작은 모델"),
-               ("개선한 시스템 (T2)", "test_013_rerank_flash36", "구조 단위 · Hybrid · rerank · 큰 모델 3.6 flash"),
-               ("Agent 구조 (T3)", "test_008b_agent950", "T2 + 스스로 점검하는 단계")]
-    cols = st.columns(3)
-    for col, (name, exp, what) in zip(cols, systems):
-        s = summary_of(exp)
+    st.write("시험 문항 90개(제공) + 직접 만든 41개 = **131문항**을 네 시스템에 한 번씩 풀게 했습니다. 시험 문제로 시스템을 고치지 않았습니다. 자세한 해석은 `submission/EVALUATION.md`에 있습니다.")
+    systems = [("처음 시스템 (T1)", "T1", "고정 800자 · 벡터 검색 · 작은 모델"),
+               ("큰 모델 개선판 (T2)", "T2", "구조 단위 · Hybrid · rerank · 큰 모델 3.6 flash"),
+               ("Agent 구조 (T3)", "T3", "T2 + 스스로 점검하는 단계"),
+               ("★ 최종 시스템 (T4)", "T4", "T2와 같은 구조 · 작은 모델 3.5 flash lite")]
+    cols = st.columns(4)
+    for col, (name, key, what) in zip(cols, systems):
+        s = final_stats(key)
         with col:
             if not s:
-                st.warning(f"{exp} 없음")
+                st.warning(f"{key} 결과 없음")
                 continue
             st.markdown(f"#### {name}")
-            st.markdown(f'<div class="big">{s["scores"]["correctness_mean"]:.3f}</div><div class="sub">정답 점수 (0~1)</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="big">{s["score"]:.3f}</div><div class="sub">정답 점수 (0~1)</div>', unsafe_allow_html=True)
             st.write("")
-            st.progress(s["scores"]["fully_correct"], text=f"완전 정답 {s['scores']['fully_correct'] * 100:.0f}%")
+            st.progress(s["full"], text=f"완전 정답 {s['full'] * 100:.0f}%")
             st.caption(what)
-            st.write(f"문항당 비용 **{s['cost']['usd_per_question']:.4f}달러** · 느린 쪽 10% 응답시간 **{s['latency_s']['p90']:.1f}초**")
+            st.write(f"문항당 비용 **{s['usd']:.4f}달러** · 느린 쪽 10% 응답시간 **{s['p90']:.1f}초**")
     st.divider()
     st.subheader("문제 종류별 점수")
-    names = {"base_positive": "용어·약관 질문", "base_negative": "답하면 안 되는 질문", "life_guide": "생활 금융 가이드", "additional": "보고서·정책 자료", "self": "직접 만든 20문항"}
+    gold = {i["qid"]: i["set"] for i in load_golden()}
+    names = {"base_positive": "용어·약관 질문", "base_negative": "답하면 안 되는 질문", "life_guide": "생활 금융 가이드", "additional": "보고서·정책 자료", "self2": "직접 만든 문항"}
     rows = []
-    for name, exp, _ in systems:
-        s = summary_of(exp)
-        if s:
-            for k, v in s["by_set"].items():
-                rows.append({"종류": f'{names.get(k, k)} ({v["n"]})', "시스템": name, "점수": v["correctness_mean"]})
+    for name, key, _ in systems:
+        by = {}
+        for m in final_rows(key):
+            by.setdefault(gold[m["qid"]], []).append(m["correctness"] / 2)
+        for k, v in by.items():
+            rows.append({"종류": f"{names.get(k, k)} ({len(v)})", "시스템": name, "점수": sum(v) / len(v)})
     if rows:
         pivot = pd.DataFrame(rows).pivot(index="종류", columns="시스템", values="점수")
         st.bar_chart(pivot, height=340)
     st.markdown("""
     <div class="note"><b>해석</b><br>
-    • 처음 → 개선: +0.17로 확실한 개선입니다(오차 범위 밖).<br>
-    • 개선 → Agent: +0.01로 오차 범위 안이라 효과가 있다고 말할 수 없고, 비용만 1.4배입니다.<br>
-    • 비용 때문에 권장 설정은 작은 모델(3.5 flash lite) + rerank입니다. 개발용 문항에서 0.894였고, <b>이 조합은 최종 시험에서 돌리지 않았습니다</b>(시험은 한 번뿐이라 이미 돌린 큰 모델 조합만 측정됨).<br>
-    • 직접 만든 20문항은 전부 만점이라 변별력이 낮습니다. 너무 쉬웠다는 한계가 있습니다.</div>
+    • 처음 → 개선(T2): +0.17로 확실한 개선입니다(오차 범위 밖).<br>
+    • 개선 → Agent(T3): +0.03으로 오차 범위 안이라 효과가 있다고 말할 수 없고, 비용은 1.5배·느린 쪽 응답시간은 2.4배입니다.<br>
+    • 큰 모델 → 작은 모델(T4): 점수는 0.03 낮지만(오차 범위 안) 비용은 0.4배, 응답은 2배 빠릅니다. 가격 때문에 T4를 최종으로 골랐습니다.<br>
+    • T4는 최종 시험을 두 번째로 쓴 것입니다(처음엔 T1~T3만 돌림). 선택 이유는 가격이고 시험 점수가 아닙니다.</div>
     """, unsafe_allow_html=True)
 
 
@@ -408,9 +437,10 @@ def page_test():
 def page_results():
     st.title("🧾 문항별 결과")
     exps = sorted(p.name for p in RESULTS.iterdir() if (p / "runs.jsonl").exists() and (p / "grades.jsonl").exists())
-    names = {"dev_013b_rerank_lite_fix": "★ 권장 설정(개발용 90문항)", "dev_013_rerank_flash36_fix": "큰 모델 + rerank(개발용)",
-             "test_013_rerank_flash36": "최종 시험 T2", "test_000_baseline": "최종 시험 T1", "test_008b_agent950": "최종 시험 T3"}
-    exp = st.selectbox("어느 실행을 볼까요?", exps, index=exps.index("dev_013b_rerank_lite_fix") if "dev_013b_rerank_lite_fix" in exps else 0,
+    names = {"test_013b_rerank_lite": "★ 최종 시험 T4 (최종 시스템)", "dev_013b_rerank_lite_fix": "최종 시스템(개발용 90문항)", "dev_013_rerank_flash36_fix": "큰 모델 + rerank(개발용)",
+             "test_013_rerank_flash36": "최종 시험 T2", "test_000_baseline": "최종 시험 T1", "test_008b_agent950": "최종 시험 T3",
+             "test_013_rerank_flash36_self2": "최종 시험 T2 (직접 만든 41문항)", "test_000_baseline_self2": "최종 시험 T1 (직접 만든 41문항)", "test_008b_agent950_self2": "최종 시험 T3 (직접 만든 41문항)"}
+    exp = st.selectbox("어느 실행을 볼까요?", exps, index=exps.index("test_013b_rerank_lite") if "test_013b_rerank_lite" in exps else 0,
                        format_func=lambda e: names.get(e, e))
     runs = {r["qid"]: r for r in jsonl(str(RESULTS / exp / "runs.jsonl"))}
     grades = {g["qid"]: g for g in jsonl(str(RESULTS / exp / "grades.jsonl"))}

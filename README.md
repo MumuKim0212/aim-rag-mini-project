@@ -55,6 +55,9 @@ python scripts/grade.py --experiment dev_000_baseline                        # �
 python scripts/evaluate.py --experiment dev_000_baseline --with-runs         # 지표·비용 → results/dev_000_baseline/
 python scripts/report.py                                                     # 비교표 → results/SUMMARY.md, out/report.html
 
+# 최종 시스템 인덱스 구축
+python scripts/build_index.py --config configs/013b-rerank-lite.yaml
+
 # 변형 실험: LLM 없이 검색만 비교
 python scripts/run.py --config configs/004-hybrid.yaml --split dev --retrieval-only
 python scripts/evaluate.py --experiment dev_004_hybrid_retrieval
@@ -63,8 +66,16 @@ python scripts/compare.py dev_000_baseline dev_004_hybrid_retrieval --metric gol
 
 - test split은 `--final` 없이는 실행·채점·평가되지 않는다(워크플로우 8단계에서만).
 - 단계별 명령은 [docs/WORKFLOW.md](docs/WORKFLOW.md)의 "Commands per step".
-- 현재 상태: 공통 기반(설정, 실행 기록, 비용, 평가, 비교표)과 기본 RAG(페이지 추출, Recursive 청킹, 벡터 검색, 답변)는 구현·테스트됨. 실험별 방식(구조 단위 청킹, BM25·Hybrid, MMR), Agent, 채점은 함수 시그니처만 있고 `NotImplementedError`를 낸다. 목록: `src/rag/__init__.py`
+- 현재 상태: 구현·평가 완료(2026-10-22). 최종 시스템 = 구조 단위 청킹 + Hybrid 검색 + LLM rerank + `gemini-3.5-flash-lite` + `answer_v4`(`configs/013b-rerank-lite.yaml`). 결과와 근거는 [submission/EVALUATION.md](submission/EVALUATION.md), 과정은 [submission/PROCESS.md](submission/PROCESS.md).
 - 페이지 추출(완료, 고정): `python scripts/extract_pages.py --vlm` → `corpus/pages.jsonl`(텍스트 레이어 + 범위 B VLM 보충) + `corpus/extraction.json` + 진단표. 다시 돌릴 필요 없음(바꾸면 근거 구절 대조·인덱스를 전부 다시 해야 함)
+
+## 화면으로 보기 (Streamlit)
+
+```bash
+streamlit run app/streamlit_app.py     # 요약, 전체 흐름, 점수가 오른 과정, 청킹, 질문 따라가기(실시간 API 호출), 최종 시험, 문항별 결과
+```
+
+의존성은 `requirements.txt`의 `streamlit`이다. 실시간 페이지는 인덱스(`out/index/`)와 `GOOGLE_API_KEY`가 있어야 하고, 나머지 페이지는 `results/`만 읽는다.
 
 ## 협업
 
