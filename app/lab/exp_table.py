@@ -40,7 +40,8 @@ if sel:
     st.divider()
 
 # ---------------------------------------------------------------- team experiments
-st.subheader("팀 실험 전체")
+st.subheader("팀 실험 전체 (만든 사람별)")
+st.caption("만든 사람 = 그 실험 결과(results/<실험>)를 처음 커밋한 사람입니다.")
 t = summary_table()
 t = t[t["종류"] != "선택 agent"]
 c1, c2, c3 = st.columns(3)
@@ -56,11 +57,13 @@ if word:
     view = view[view["실험"].str.contains(word, case=False) | view["설명"].fillna("").str.contains(word, case=False)]
 
 num = ["정답 점수", "완전 정답률", "대응 일치율", "출처 일치율", "정답 페이지 포함", "근거 문장 포함률", "MRR"]
-st.dataframe(
-    view.drop(columns=["만든 시각"]).style.format({c: "{:.3f}" for c in num} | {
-        "USD/문항": "{:.4f}", "LLM 호출/문항": "{:.2f}", "p50 초": "{:.1f}", "p90 초": "{:.1f}", "문맥 글자 수": "{:,.0f}"},
-        na_rep="–").background_gradient(subset=["정답 점수"], cmap="Greens"),
-    width="stretch", hide_index=True, height=520)
+for who, part in view.groupby("만든 사람", sort=False):
+    st.markdown(f"**{who}** · {len(part)}개 실험")
+    st.dataframe(
+        part.drop(columns=["만든 시각", "만든 사람"]).style.format({c: "{:.3f}" for c in num} | {
+            "USD/문항": "{:.4f}", "LLM 호출/문항": "{:.2f}", "p50 초": "{:.1f}", "p90 초": "{:.1f}", "문맥 글자 수": "{:,.0f}"},
+            na_rep="–").background_gradient(subset=["정답 점수"], cmap="Greens"),
+        width="stretch", hide_index=True, height=min(520, 38 + 35 * len(part)))
 st.caption(f"{len(view)}개 실험. 정답 점수가 비어 있는 행은 답변을 만들지 않은 검색 비교 실험입니다. "
            "같은 이름에 _r2가 붙은 것은 잡음 측정을 위한 재실행, _fix는 버그 수정 뒤 재실행입니다.")
 

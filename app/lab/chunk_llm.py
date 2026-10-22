@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-from lab.common import SETS, agent_bars, chunk_frame, compare_runs, picked_note, picked_runs, rows, styled, summary
+from lab.common import SETS, agent_bars, chunk_frame, compare_runs, maker_of, picked_note, picked_runs, rows, styled, summary
 
 st.title("🧪 청킹·검색 비교 (LLM 사용 후)")
 st.caption("검색만 비교한 실험(LLM 없이) 중 실제로 LLM이 답을 쓰고 채점까지 한 실험들입니다. 같은 청킹·검색 설정을 "
@@ -56,11 +56,12 @@ for name, exp, twin in RUNS:
         "정답 점수": sc["correctness_mean"], "완전 정답률": sc["fully_correct"], "대응 일치율": sc["status_ok"],
         "출처 일치율": sc["citation_on_target"], "근거 문장 포함률": rt.get("evid@5"), "정답 페이지 포함": rt.get("page_hit@5"),
         "USD/문항": co["usd_per_question"], "p90 초": la["p90"],
-        "답변 모델": (cfg.get("answer") or {}).get("model", "").replace("gemini-", ""), "실험": exp}
+        "답변 모델": (cfg.get("answer") or {}).get("model", "").replace("gemini-", ""), "만든 사람": maker_of(exp),
+        "실험": exp}
 df = pd.DataFrame(cols)
-num = df.drop(index=["답변 모델", "실험"])
+num = df.drop(index=["답변 모델", "만든 사람", "실험"])
 st.dataframe(styled(num.apply(pd.to_numeric, errors="coerce")), width="stretch")
-st.dataframe(df.loc[["답변 모델", "실험"]], width="stretch")
+st.dataframe(df.loc[["만든 사람", "답변 모델", "실험"]], width="stretch")
 st.caption("열 = 실험, 초록 = 가장 좋은 값, 빨강 = 가장 나쁜 값. 위 두 줄은 LLM 없이 잰 검색 지표(그 설정의 --retrieval-only "
            "실행, 상위 5개), 나머지는 LLM이 답하고 채점한 결과입니다(dev 90문항).")
 

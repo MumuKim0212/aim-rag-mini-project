@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -90,43 +91,60 @@ def _resolve(blobs: Blobs, sha: str, name: str, seen=()) -> dict:
     return d
 
 
+SYSTEM_RE = re.compile(r'if name == "(\w+)":[^\n]*\n\s*from \.(\w+) import')  # a comment may follow the colon
+RULES = 3  # bump when what scan() records changes; cached commits made under older rules are scanned again
+
+
+def agent_modules(blobs: "Blobs", sha: str) -> dict[str, str]:
+    """System name -> implementation file, for the systems whose module builds a LangGraph graph (StateGraph) and
+    is not the card-008 stub. Read from that commit's src/rag/systems.py, so a teammate's new agent under any name
+    is found the same way."""
+    out = {}
+    for system, module in SYSTEM_RE.findall(blobs.read(f"{sha}:src/rag/systems.py") or ""):
+        path = f"src/rag/{module}.py"
+        text = blobs.read(f"{sha}:{path}") or ""
+        if "StateGraph(" in text and STUB not in text:
+            out[system] = path
+    return out
+
+
 def scan(fetch: bool = True) -> list[dict]:
     """Agent entries on every remote branch; cached per commit in out/agent_runs/branch_agents.json."""
     HOME.mkdir(parents=True, exist_ok=True)
     cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
     found, blobs = [], None
     for branch, sha in branches(fetch):
-        if sha not in cache or any("maker" not in e for e in cache[sha]["agents"]):
+        if cache.get(sha, {}).get("rules") != RULES:
             blobs = blobs or Blobs()
             files = [f.split("/")[-1] for f in git("ls-tree", "--name-only", sha, "configs/").split()
                      if f.endswith(".yaml")]
-            agent_py = blobs.read(f"{sha}:src/rag/agent.py") or ""
-            has_repair = blobs.read(f"{sha}:src/rag/agent_repair.py") is not None
+            impls = agent_modules(blobs, sha)  # system name -> file that builds a LangGraph agent
+            impl_times = {path: int(git("log", "-1", "--format=%ct", sha, "--", path).strip() or 0) for path in impls.values()}
             code = git("rev-parse", f"{sha}:src/rag").strip()
             entries = []
             for f in files:
                 cfg = _resolve(blobs, sha, f)
                 system = str(cfg.get("system", ""))
-                if not system.startswith("agent"):
+                if system not in impls:
                     continue
-                if (system == "agent" and (not agent_py or STUB in agent_py)) or (system == "agent_repair" and not has_repair):
-                    continue
+                impl = impls[system]
                 ident = hashlib.sha1(json.dumps([code, cfg], sort_keys=True, default=str).encode()).hexdigest()[:8]
-                added = int(git("log", "-1", "--format=%ct", sha, "--", f"configs/{f}").strip() or 0)
+                cfg_time = int(git("log", "-1", "--format=%ct", sha, "--", f"configs/{f}").strip() or 0)
                 # when the config first appeared on this branch, and what the agent is (config + its implementation
                 # file), so a copy of another teammate's agent can be told from the branch's own (latest_per_branch)
                 first = git("log", "--diff-filter=A", "--format=%ct", sha, "--", f"configs/{f}").split()
                 makers = git("log", "--diff-filter=A", "--format=%an", sha, "--", f"configs/{f}").splitlines()
-                impl = "src/rag/agent_repair.py" if system == "agent_repair" else "src/rag/agent.py"
                 origin = hashlib.sha1(json.dumps([git("rev-parse", f"{sha}:{impl}").strip(), cfg], sort_keys=True,
                                                  default=str).encode()).hexdigest()[:8]
-                entries.append({"config": f, "name": cfg.get("name"), "system": system, "added": added,
-                                "first_added": int(first[-1]) if first else added, "origin_key": origin,
+                entries.append({"config": f, "name": cfg.get("name"), "system": system, "impl": impl,
+                                # last upload of this agent on the branch: its implementation file or its config
+                                "added": max(cfg_time, impl_times[impl]), "impl_time": impl_times[impl], "config_time": cfg_time,
+                                "first_added": int(first[-1]) if first else cfg_time, "origin_key": origin,
                                 "maker": makers[-1] if makers else "",  # who first committed this agent's config
                                 "description": cfg.get("description", ""), "answer_model": cfg.get("answer", {}).get("model"),
                                 "chunking": cfg.get("chunking", {}), "card": cfg.get("card"), "same_code_id": ident,
                                 "judge": cfg.get("judge", {})})
-            cache[sha] = {"date": git("log", "-1", "--format=%ad", "--date=format:%Y-%m-%d %H:%M", sha).strip(),
+            cache[sha] = {"rules": RULES, "date": git("log", "-1", "--format=%ad", "--date=format:%Y-%m-%d %H:%M", sha).strip(),
                           "author": git("log", "-1", "--format=%an", sha).strip(), "agents": entries}
         for e in cache[sha]["agents"]:
             found.append({**e, "branch": branch, "commit": sha[:7], "sha": sha, "date": cache[sha]["date"],

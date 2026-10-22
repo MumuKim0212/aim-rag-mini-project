@@ -2,8 +2,8 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from lab.common import (HIGHER, LOWER, agent_bars, chunk_frame, paired, picked_note, picked_runs, rows, styled, summary,
-                        summary_table)
+from lab.common import (HIGHER, LOWER, agent_bars, chunk_frame, colors, paired, picked_note, picked_runs, rows, styled,
+                        summary, summary_table)
 
 st.title("🔍 청킹·검색 비교 (LLM 없이)")
 st.caption("답변을 만들지 않고 검색 결과만 채점한 실험들입니다(`--retrieval-only`). 정답 페이지와 근거 문장이 "
@@ -49,15 +49,33 @@ if runs:
 # ---------------------------------------------------------------- retrieval-only experiments
 t = summary_table()
 r = t[(t["split"] == "dev") & (t["종류"] == "검색만")].copy()
-r = r[["실험", "설명", "정답 페이지 포함", "근거 문장 포함률", "MRR", "문맥 글자 수", "카드"]].sort_values("근거 문장 포함률", ascending=False)
-st.subheader("검색만 비교한 실험 (팀 실험)")
-st.dataframe(r.style.format({"정답 페이지 포함": "{:.3f}", "근거 문장 포함률": "{:.3f}", "MRR": "{:.3f}",
-                             "문맥 글자 수": "{:,.0f}"}), width="stretch", hide_index=True)
-st.altair_chart(alt.Chart(r).mark_circle(size=120).encode(
-    x=alt.X("문맥 글자 수:Q", scale=alt.Scale(zero=False)), y=alt.Y("근거 문장 포함률:Q", scale=alt.Scale(zero=False)),
-    color=alt.Color("정답 페이지 포함:Q", scale=alt.Scale(scheme="viridis")),
-    tooltip=["실험", "설명", "정답 페이지 포함", "근거 문장 포함률", "MRR", "문맥 글자 수"]), width="stretch")
-st.caption("오른쪽 위로 갈수록 근거는 많이 담지만 문맥이 길어집니다. 왼쪽 위가 효율이 좋은 방식입니다.")
+r = r[["실험", "만든 사람", "설명", "정답 페이지 포함", "근거 문장 포함률", "MRR", "문맥 글자 수", "카드"]].sort_values("근거 문장 포함률", ascending=False)
+st.subheader("검색만 비교한 실험 (팀 실험, 만든 사람별)")
+FMT = {"정답 페이지 포함": "{:.3f}", "근거 문장 포함률": "{:.3f}", "MRR": "{:.3f}", "문맥 글자 수": "{:,.0f}"}
+for who, part in r.groupby("만든 사람", sort=False):
+    st.markdown(f"**{who}** · {len(part)}개 실험")
+    st.dataframe(part.drop(columns=["만든 사람"]).style.format(FMT), width="stretch", hide_index=True)
+
+pts = r.assign(이름표=r["실험"].str.removeprefix("dev_").str.removesuffix("_retrieval"))
+makers = list(dict.fromkeys(pts["만든 사람"]))
+x = alt.X("문맥 글자 수:Q", scale=alt.Scale(zero=False), title="문맥 글자 수 (문항당)")
+y = alt.Y("근거 문장 포함률:Q", scale=alt.Scale(zero=False))
+tb = alt.Chart(pts).encode(x=x, y=y, tooltip=["실험", "만든 사람", "설명", "정답 페이지 포함", "근거 문장 포함률", "MRR", "문맥 글자 수"])
+layers = [tb.mark_circle(size=140).encode(color=alt.Color("만든 사람:N", scale=alt.Scale(domain=makers, scheme="set2"),
+                                                          title="팀 실험: 만든 사람")),
+          tb.mark_text(dx=8, align="left", fontSize=10, color="#94a3b8").encode(text="이름표:N")]
+if runs:
+    df_pts, _ = chunk_frame(runs)
+    ap = pd.DataFrame([{"agent": n, "이름표": "🤖 " + n.split(".")[0], "근거 문장 포함률": df_pts.loc["근거 문장 포함률", n],
+                        "문맥 글자 수": df_pts.loc["문맥 글자 수", n] if "문맥 글자 수" in df_pts.index else df_pts.loc["문항당 문맥 글자 수", n],
+                        "만든 사람": next(x_["maker"] for x_ in runs if x_["name"] == n)} for n in df_pts.columns])
+    ab = alt.Chart(ap).encode(x=x, y=y, tooltip=["agent", "만든 사람", "근거 문장 포함률", "문맥 글자 수"])
+    layers += [ab.mark_point(shape="diamond", filled=True, size=380, stroke="white", strokeWidth=1.5).encode(
+                   color=alt.Color("agent:N", scale=colors(list(ap["agent"])), title="🤖 선택한 agent (최종 문맥)")),
+               ab.mark_text(dx=12, align="left", fontSize=12, fontWeight="bold", color="#e2e8f0").encode(text="이름표:N")]
+st.altair_chart(alt.layer(*layers).resolve_scale(color="independent").properties(height=380), width="stretch")
+st.caption("동그라미 = 팀 실험(색 = 만든 사람, 옆 글자 = 실험 이름), 큰 마름모 = 고른 agent(재검색까지 한 최종 문맥 기준이라 "
+           "검색만 한 실험보다 문맥이 깁니다). 왼쪽 위로 갈수록 적은 문맥으로 근거를 많이 담습니다.")
 
 # ---------------------------------------------------------------- baseline vs every picked agent
 st.subheader("두 방식 짝비교: 기준 vs 선택한 agent")

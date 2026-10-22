@@ -4,9 +4,10 @@ import streamlit as st
 from lab.common import BA, branch_agents, duplicate_agents, latest_run, picked_runs
 
 st.title("🤖 agent_list")
-st.caption("GitHub 저장소 aim-rag-mini-project의 모든 브랜치(main 포함)에서 커밋된 agent를 찾아, 브랜치마다 가장 최근 agent를 고른 뒤 "
-           "같은 agent가 여러 브랜치에 있으면(병합·복사) 만든 사람의 브랜치에서 한 번만 보여 줍니다. 고른 agent는 아래 메뉴"
-           "(청킹·실험·에이전트·최종 평가·문항별 결과)에 자동으로 함께 나옵니다.")
+st.caption("GitHub 저장소 aim-rag-mini-project의 모든 브랜치(main 포함)에서 agent 파일(LangGraph 그래프를 만드는 코드, "
+           "src/rag/systems.py에 등록된 것)을 찾습니다. 브랜치의 다른 파일이 언제 올라왔는지와 상관없이, 브랜치마다 agent 파일이나 "
+           "그 설정을 마지막으로 올린 agent 하나를 고르고, 같은 agent가 여러 브랜치에 있으면(병합·복사) 한 번만 보여 줍니다. "
+           "고른 agent는 아래 메뉴에 자동으로 함께 나옵니다.")
 
 c1, c2 = st.columns([4, 1])
 if c2.button("🔄 목록 새로고침", width="stretch"):
@@ -19,7 +20,7 @@ if st.session_state.get("branch_agents_note"):
 chosen = set(st.session_state.get("picked_agents", []))
 same = pd.Series([a["same_code_id"] for a in agents]).value_counts()
 table = pd.DataFrame([{
-    "선택": a["label"] in chosen, "agent": a["label"], "설정": a["config"].removesuffix(".yaml"),
+    "선택": a["label"] in chosen, "agent": a["label"], "agent 파일": a.get("impl", ""), "설정": a["config"].removesuffix(".yaml"),
     "만든 사람": a.get("maker", ""), "올라온 시각": a["added_at"], "커밋": a["commit"], "브랜치 마지막 커밋": a["author"],
     "답변 모델": a["answer_model"],
     "결과": (lambda r, old: f"{r['n']}문항 · {r['correctness']:.3f}" if r else ("이전 버전 결과만 있음" if old else "없음"))(

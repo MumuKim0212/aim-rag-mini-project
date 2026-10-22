@@ -9,7 +9,7 @@ st.caption("LangGraph가 컴파일한 그래프(`graph.get_graph()`)에서 바�
            "코드가 바뀌면 그림도 같이 바뀝니다. API는 쓰지 않습니다.")
 picked_note()
 if picked():
-    st.page_link("lab/langgraph.py", label="🤖 선택한 agent들의 흐름도는 '1. 데이터 › langgraph'에서 나란히 봅니다", icon="🧭")
+    st.page_link("lab/langgraph.py", label="🤖 선택한 agent들의 흐름도는 '개요 › langgraph'에서 나란히 봅니다", icon="🧭")
 st.caption("아래는 이 저장소(현재 브랜치)에 있는 에이전트 세 가지입니다.")
 
 AGENTS = {

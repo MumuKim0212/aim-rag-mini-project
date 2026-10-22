@@ -37,9 +37,11 @@ if picked():
                 f"{names[0]} 와 {name}: 청크 {len(base):,}개 / {len(other):,}개 중 {same:,}개가 완전히 같습니다"
                 + (" → 두 agent의 청킹은 똑같습니다(차이는 검색 이후 단계에서 납니다)." if same == len(base) == len(other) else "."))
     dist = pd.DataFrame([{"agent": name, "길이": x["chars"]} for name in names for x in ch_by[name]])
-    st.altair_chart(alt.Chart(dist).mark_bar(opacity=0.55).encode(
-        x=alt.X("길이:Q", bin=alt.Bin(maxbins=40), title="청크 길이 (글자)"), y=alt.Y("count()", stack=None, title="청크 수"),
-        color=alt.Color("agent:N", scale=colors(names), title=None)), width="stretch")
+    st.markdown("**청크 길이 분포** (agent마다 따로, 같은 축)")
+    st.altair_chart(alt.Chart(dist).mark_bar().encode(
+        x=alt.X("길이:Q", bin=alt.Bin(maxbins=30), title="청크 길이 (글자)"), y=alt.Y("count()", title="청크 수"),
+        color=alt.Color("agent:N", scale=colors(names), legend=None), tooltip=["agent", "count()"]
+    ).properties(width=300, height=200).facet(column=alt.Column("agent:N", title=None, sort=names)))
 
     st.markdown("**같은 페이지를 agent마다 어떻게 나눴는지**")
     files = sorted({x["source"] for x in ch_by[names[0]]})
@@ -98,12 +100,14 @@ st.dataframe(stats, width="stretch", hide_index=True)
 st.caption("구조 단위 청킹은 용어집을 용어 1개, 약관을 조 1개씩 나누고 나머지 문서는 Recursive로 자릅니다. "
            "혼합은 너무 긴 조항을 글자 수 상한에서 한 번 더 자릅니다(`chunking.hard_cap`, 혼합 설정에서만 켜짐).")
 
-picked = st.multiselect("길이 분포를 볼 방식", list(CHUNKERS), default=list(CHUNKERS)[:1] + list(CHUNKERS)[3:5])
-if picked:
-    dist = pd.DataFrame([{"방식": n, "길이": len(c["content"])} for n in picked for c in chunk(CHUNKERS[n], scope)])
-    st.altair_chart(alt.Chart(dist).mark_bar(opacity=0.6).encode(
-        x=alt.X("길이:Q", bin=alt.Bin(maxbins=40), title="청크 길이 (글자)"),
-        y=alt.Y("count()", stack=None, title="청크 수"), color=alt.Color("방식:N")), width="stretch")
+picked_methods = st.multiselect("길이 분포를 볼 방식", list(CHUNKERS), default=list(CHUNKERS)[:1] + list(CHUNKERS)[3:5])
+if picked_methods:
+    dist = pd.DataFrame([{"방식": n, "길이": len(c["content"])} for n in picked_methods for c in chunk(CHUNKERS[n], scope)])
+    st.altair_chart(alt.Chart(dist).mark_bar().encode(
+        x=alt.X("길이:Q", bin=alt.Bin(maxbins=30), title="청크 길이 (글자)"), y=alt.Y("count()", title="청크 수"),
+        color=alt.Color("방식:N", legend=None), tooltip=["방식", "count()"]
+    ).properties(width=260, height=180).facet(facet=alt.Facet("방식:N", title=None, sort=picked_methods), columns=3))
+    st.caption("방식마다 따로 그린 막대입니다(같은 축). 막대가 오른쪽으로 갈수록 긴 청크가 많습니다.")
 
 st.subheader("같은 페이지가 어떻게 나뉘는지")
 c1, c2, c3 = st.columns([2, 2, 1])

@@ -76,7 +76,7 @@ def result_dir(exp: str) -> Path:
     return p if p.exists() else BA.RESULTS / exp
 
 
-# ---------------------------------------------------------------- agents picked on 1. 데이터 > agent_list
+# ---------------------------------------------------------------- agents picked on 개요 > agent_list
 
 FETCH_EVERY_S = 300
 
@@ -286,7 +286,7 @@ def picked_note():
     """One line at the top of a page: which picked agents this page includes."""
     runs, sel = picked_runs(), picked()
     if not sel:
-        st.caption("👈 '1. 데이터 › agent_list'에서 agent를 고르면 이 페이지에 그 agent들의 결과가 함께 나옵니다.")
+        st.caption("👈 '개요 › agent_list'에서 agent를 고르면 이 페이지에 그 agent들의 결과가 함께 나옵니다.")
     else:
         missing = [a["label"] for a in sel if not latest_run(a)]
         st.info("🤖 선택한 agent: " + " · ".join(r["name"] for r in runs)
@@ -325,6 +325,31 @@ def rows(exp: str, name: str) -> list[dict]:
     return jsonl(str(result_dir(exp) / name))
 
 
+@st.cache_data
+def _result_makers(head: str) -> dict:
+    """Experiment -> author of the commit that first added results/<experiment>/ (git history of this checkout)."""
+    import subprocess
+    out, who = {}, None
+    log = subprocess.run(["git", "log", "--diff-filter=A", "--format=@@%an", "--name-only", "--", "results/*/summary.json"],
+                         cwd=ROOT, capture_output=True, text=True, encoding="utf-8").stdout
+    for line in log.splitlines():
+        if line.startswith("@@"):
+            who = line[2:]
+        elif line.startswith("results/"):
+            out[line.split("/")[1]] = who
+    return out
+
+
+def maker_of(exp: str) -> str:
+    """Who made an experiment: the committer of its results, or the maker of a picked agent's run."""
+    import subprocess
+    runs = {r["experiment"]: r.get("maker") for r in picked_runs()}
+    if exp in runs:
+        return runs[exp] or "-"
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    return _result_makers(head).get(exp, "(커밋 안 됨)")
+
+
 def summary_table() -> pd.DataFrame:
     names = {r["experiment"]: "🤖 " + r["name"] for r in picked_runs()}
     out = []
@@ -333,7 +358,7 @@ def summary_table() -> pd.DataFrame:
         sc, rt, co, ca, la = (s.get(k) or {} for k in ("scores", "retrieval", "cost", "calls", "latency_s"))
         kind = "검색만" if s.get("retrieval_only") else ("Agent" if str(s.get("system", "")).startswith("agent") else "RAG")
         out.append({
-            "실험": exp, "이름": names.get(exp) or LABELS.get(exp, ""), "split": s.get("split"),
+            "실험": exp, "이름": names.get(exp) or LABELS.get(exp, ""), "만든 사람": maker_of(exp), "split": s.get("split"),
             "종류": "선택 agent" if exp in names else kind, "문항 수": s.get("n_questions"),
             "정답 점수": sc.get("correctness_mean"), "완전 정답률": sc.get("fully_correct"),
             "대응 일치율": sc.get("status_ok"), "출처 일치율": sc.get("citation_on_target"),

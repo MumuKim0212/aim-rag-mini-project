@@ -3,7 +3,7 @@
     streamlit run app/lab_app.py
 
 Reads committed files (results/, golden/, corpus/, configs/, experiments/) plus the runs made on
-"1. 데이터 › agent_list" (out/agent_runs/, scripts/branch_agents.py): every app start looks up the newest agent on
+"개요 › agent_list" (out/agent_runs/, scripts/branch_agents.py): every app start looks up the newest agent on
 each origin branch; the agents picked there appear in every page below, and "langgraph" draws their graphs from
 their own branch code. Runs and "질문 직접 실행" call the API (needs .env and the indexes in out/index).
 """
@@ -16,12 +16,12 @@ P = "lab/"
 nav = st.navigation({
     "개요": [
         st.Page(P + "home.py", title="실습 한눈에 보기", icon="🏠", default=True),
+        st.Page(P + "agent_list.py", title="agent_list", icon="🤖"),
+        st.Page(P + "langgraph.py", title="langgraph", icon="🧭"),
     ],
     "1. 데이터": [
         st.Page(P + "data_docs.py", title="문서와 페이지 추출", icon="📄"),
         st.Page(P + "data_golden.py", title="골든셋", icon="🎯"),
-        st.Page(P + "agent_list.py", title="agent_list", icon="🤖"),
-        st.Page(P + "langgraph.py", title="langgraph", icon="🧭"),
     ],
     "2. 청킹": [
         st.Page(P + "chunk_stats.py", title="청킹 방식별 청크", icon="✂️"),
@@ -67,7 +67,7 @@ with st.sidebar:
     runs = {r["label"]: r for r in picked_runs()}
     sel = picked()
     if not sel:
-        st.caption("없음 · '1. 데이터 › agent_list'에서 고르세요")
+        st.caption("없음 · '개요 › agent_list'에서 고르세요")
     for n, a in enumerate(sel, 1):
         r = runs.get(a["label"])
         st.caption(f"{n}. {a['label']} — " + (f"{r['correctness']:.3f} ({r['n']}문항)" if r else "결과 없음"))

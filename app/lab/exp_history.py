@@ -64,18 +64,19 @@ kind_scale = alt.Scale(domain=kinds, scheme="tableau10")
 
 st.subheader("팀 실험 점수 변화 (실행 순서)")
 base = alt.Chart(d).encode(x=alt.X("순서:Q", title="실행 순서"),
-                           tooltip=["순서", "실험", "바꾼 것", "설명", metric, "USD/문항", "p90 초"])
+                           tooltip=["순서", "실험", "만든 사람", "바꾼 것", "설명", metric, "USD/문항", "p90 초"])
 line = base.mark_line(color="#cbd5e1").encode(y=alt.Y(f"{metric}:Q", scale=alt.Scale(zero=False)))
-dots = base.mark_circle(size=130).encode(y=f"{metric}:Q", color=alt.Color("바꾼 것:N", scale=kind_scale, title="바꾼 것",
-                                                                          legend=alt.Legend(orient="right")))
+dots = base.mark_point(size=130, filled=True).encode(
+    y=f"{metric}:Q", color=alt.Color("바꾼 것:N", scale=kind_scale, title="바꾼 것", legend=alt.Legend(orient="right")),
+    shape=alt.Shape("만든 사람:N", title="만든 사람", legend=alt.Legend(orient="right")))
 text = base.mark_text(dy=-12, fontSize=10, color="#94a3b8").encode(y=f"{metric}:Q", text="이름표:N")
 ref = alt.Chart(d).mark_rule(strokeDash=[4, 4], color="red").encode(y=alt.datum(0.722))
 st.altair_chart((line + dots + text + ref).properties(height=380), width="stretch")
-st.caption("점 색 = 그 실험에서 바꾼 것(오른쪽 범례), 점 위 글자 = 실험 이름. 빨간 점선 = 처음 RAG 정답 점수 0.722. "
+st.caption("점 색 = 그 실험에서 바꾼 것, 점 모양 = 만든 사람(오른쪽 범례), 점 위 글자 = 실험 이름. 빨간 점선 = 처음 RAG 정답 점수 0.722. "
            "같은 설정을 다시 돌리면 90문항 중 약 14문항이 바뀌므로 작은 차이는 잡음일 수 있습니다.")
 
 st.subheader("비용과 점수")
-team_pts = d[["순서", "실험", "이름표", "바꾼 것", "정답 점수", "USD/문항", "p90 초", "설명"]]
+team_pts = d[["순서", "실험", "이름표", "만든 사람", "바꾼 것", "정답 점수", "USD/문항", "p90 초", "설명"]]
 agent_pts = []
 for n, a in enumerate(sel, 1):
     runs = all_runs(a)
@@ -87,7 +88,7 @@ for n, a in enumerate(sel, 1):
                           "설명": f"{r['n']}문항 · {a['description'][:80]}"})
 x = alt.X("USD/문항:Q", title="문항당 비용 (USD)")
 y = alt.Y("정답 점수:Q", scale=alt.Scale(zero=False))
-tb = alt.Chart(team_pts).encode(x=x, y=y, tooltip=["실험", "바꾼 것", "정답 점수", "USD/문항", "p90 초", "설명"])
+tb = alt.Chart(team_pts).encode(x=x, y=y, tooltip=["실험", "만든 사람", "바꾼 것", "정답 점수", "USD/문항", "p90 초", "설명"])
 layers = [tb.mark_circle(size=140).encode(color=alt.Color("바꾼 것:N", scale=kind_scale, title="팀 실험: 바꾼 것")),
           tb.mark_text(dx=8, align="left", fontSize=10, color="#94a3b8").encode(text="이름표:N")]
 if agent_pts:
@@ -100,5 +101,5 @@ st.altair_chart(alt.layer(*layers).resolve_scale(color="independent").properties
 st.caption("왼쪽 위로 갈수록 싸고 정확합니다. 동그라미 = 팀 실험(색 = 바꾼 것, 옆 글자 = 실험 이름), 큰 마름모 = 고른 agent(🤖 번호, 최근 실행).")
 
 with st.expander("실험 목록 (순서·바꾼 것·설명)"):
-    st.dataframe(d[["순서", "실험", "바꾼 것", "정답 점수", "완전 정답률", "대응 일치율", "USD/문항", "p90 초", "설명"]],
+    st.dataframe(d[["순서", "실험", "만든 사람", "바꾼 것", "정답 점수", "완전 정답률", "대응 일치율", "USD/문항", "p90 초", "설명"]],
                  width="stretch", hide_index=True)

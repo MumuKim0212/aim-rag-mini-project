@@ -14,7 +14,7 @@ def graph_text(sha: str, config: str) -> str:
 
 sel = picked()
 if not sel:
-    st.info("👈 '1. 데이터 › agent_list'에서 agent를 고르면 여기에 흐름도가 나옵니다.")
+    st.info("👈 '개요 › agent_list'에서 agent를 고르면 여기에 흐름도가 나옵니다.")
     st.stop()
 
 with st.expander("노드 이름 읽는 법", expanded=False):
