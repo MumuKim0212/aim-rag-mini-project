@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 016: Answer prompt v6 — state the scope of the answer
 
-Status: planned (sections 1–4 written 2026-10-22 before any v6 run; no LLM call made for this card yet)
+Status: decided (v6 rejected: guard failed, no gain distinguishable from noise; sections 1–4 written 2026-10-22 before any v6 run)
 Date: 2026-10-22
 
 ## 1. Hypothesis
@@ -42,10 +42,30 @@ Date: 2026-10-22
 
 ## 5. Results
 
-_Not run yet._
+Run `dev_016_lite_v6` (2026-10-22, dev 90, 0 errors; a 3-question smoke run under the same name came first and was kept by the resume). Reference: `dev_013b_rerank_lite_fix` (T4 on dev).
+
+| | T4 `dev_013b_rerank_lite_fix` | v6 `dev_016_lite_v6` |
+|---|---|---|
+| Answer score (0–1) / points | 0.894 / 161 | 0.889 / 160 |
+| Fully correct / status match / citation on a gold page | 81.1% / 96.7% / 95.9% | 81.1% / 94.4% / 95.9% |
+| Paired vs T4 (better / worse / same) | – | 3 / 4 / 83, diff −0.006, CI [−0.033, +0.022], net −1 |
+| LLM calls / question | 2.0 | 2.0 |
+| Tokens / question | 9,796 | 10,055 (1.03×) |
+| USD / question (answer + rerank) | 0.003504 | 0.003586 (1.02×) |
+| p90 latency | 4.0 s | 11.1 s (cause not checked) |
+| Garbled outputs (`garble_scan.py`) | – | 0 of 90 |
+
+- v6 better: ADD-SE08 (1 → 2), POS054 (1 → 2), POS078 (1 → 2). T4 better: ADD-HP09 (2 → 1), ADD-PF06 (2 → 1), NEG025 (2 → 1, refused → answered), POS057 (1 → 0, answered → abstained).
+- Guard (section 3): 3 of 73 fully correct reference answers fell below 2 (NEG025, ADD-HP09, ADD-PF06; limit 2) and `status_ok` fell by 2 questions (87 → 85; limit 1). **Both fail.**
+- Mechanism (descriptive): ADD-SE08 now says the aggregate does not carry over to one household ("개별 가구 단위에 그대로 적용하기에는 한계가 있을 수 있습니다"), 1 → 2. ADD-IN04 has no sentence about other insurance types and stays 1 → 1: rule 12 (a) did not fire. A regex count of scope-like phrases finds 2 v6 answers (ADD-SE08, ADD-PF08) against 0 in T4; mean answer length is 448 vs 449 characters, so the rule changed few answers.
+- Better-than-T4 rule (net wins ≥ 9, more than 14 changed, CI excludes 0): net −1, 7 changed, CI includes 0 → not met.
+- Run-to-run variation seen in this pair: the retrieval settings are identical, yet the final context set differs in 45 of 90 questions (the rerank is an LLM call and `gemini-3.5-flash-lite` ignores `temperature: 0`). Of the 7 questions whose score changed, 4 had a different context (ADD-PF06, NEG025, ADD-SE08, POS078) and 3 the same context (POS054, POS057, ADD-HP09).
+- LLM calls used: rerank 90 + answers 90 + judge 90 = 270 (USD 0.323 answer side incl. embeddings 0.001, judge 0.133).
 
 ## 6. Decision and notes
 
-- Decision: _pending_
-- Why, with question IDs: _pending_
-- What the criteria missed, if anything: _pending_
+- Decision: **reject.** The guard failed on both conditions written before the run, and the gain is not distinguishable from noise (−0.006, CI includes 0). The final system stays T4; v6 is reported as a tried, not-adopted change.
+- Why, with question IDs: rule 12 changed few answers. It produced the intended scope sentence on ADD-SE08, but the context of ADD-SE08 also differed from T4's, so the gain cannot be assigned to the rule alone. It did nothing on ADD-IN04. Of the four questions that got worse, two had a different context (ADD-PF06, NEG025) and one (ADD-HP09) answered from the same context with one part missing; POS057 switched from answered to abstained on the same context. With the rule so rarely active these look like run-to-run variation, but this run cannot separate that from an effect of the rule.
+- What the criteria missed: the guard of 2 drops was too tight for this noise. A rerun alone flips 14 of 90 questions (PROCESS §4), and here 45 of 90 context sets change with unchanged settings, so a guard of 2 can fail by chance. The criteria were not changed after the results; the decision above follows them as written. The expected gain (at most +2 questions) was far below what one dev run can show.
+- Consequence for any later comparison on the final chain: a single dev run of an answer-step change cannot be separated from the rerank variation. A comparison that replays the stored contexts of T4 through the answer step only, and repeats each arm, would remove that part; it was not built because the final system is fixed and the possible gain is small (+0.01 to +0.02).
+- Not changed by this card: T4, the test split, the self-written sets. `answer_v6` stays frozen.
