@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 001b: Chunk size 500 / 700 / 900 (follow-up of 001)
 
-Status: llm-free done (winner 900/112 at the retrieval level; headroom gate failed, so no answer run unless waived)
+Status: superseded (900/112 was later answer-run in card 002b and on the final chain in cards 001d / 001e; the chain ended at 950/119). Original: llm-free done (winner 900/112 at the retrieval level; headroom gate failed, so no answer run unless waived)
 Date: 2026-10-21
 
 ## 1. Hypothesis

@@ -277,6 +277,7 @@ _이 수치보다 작은 차이는 결과로 해석하지 않는다._
 | 013 | LLM rerank (Hybrid 후보 15 → 5, 재순위 모델 = 답변 모델) | evid@5 0.861 → 0.938(3.6 flash) / 0.945(lite) | – | 실행 90+90+90 ×2 | 3.6 flash 0.883 → 0.928, lite 0.856 → 0.894, 둘 다 순승 +7·CI가 0 제외. 비용 상한(1.6배)만 2.1배로 미달. **사용자가 3.6 flash + v4 + rerank를 T2로 채택(2026-10-22)** |
 | 002b | 답변 실행 (헤드룸 면제 2026-10-21): A 900/112 단독, B 구조 단위 + 나머지 900/112 | – | – | 실행 90+90 ×2 | 둘 다 기준 미달: A 0.717 (기준 0.722, 순승 +1), B 0.756 (+0.033, 순승 +2, 신뢰구간 0 포함). B는 대응 일치 92.2% (기준 82.2%), 토큰 0.90배, 깨진 출력 0. 기준 규칙은 미달, 사용자가 2026-10-21에 B를 개선 RAG 체인으로 채택 (점수 최고·비용 낮음·나쁜 지표 없음 근거, 채택 기준 통과 아님) |
 | 002 | 구조 단위 청킹 (용어집 용어, 약관 조, 나머지 Recursive 800/100) | 통과: evid@5 0.795, 순증감 +10 (11개 개선 / 1개 악화), 문맥 2,512자, 잘린 근거 7 → 6 | 9 / 1 → 8 ≤ 14 불통과 | 생략 (면제 결정 대기) | 미채택 (판정 보류) |
+| 014 | Agent v2 (최종 test 뒤): 분류 결과·근거 부족을 답변에 메모로 전달 + 답변 검사(`gemini-3.8-flash`)·1회 고쳐 쓰기 + 종료 이유 (T3 그래프 기준) | – | – | 실행 90+90 ×2 (v1·v2 동시) + self2 41 | v2 0.928 = T2 0.928 (2 / 2 / 86), 검사 노드가 겨냥한 10문항 중 0문항 지적 → 채택 안 함. 같이 돌린 T3 dev 0.939 (T2 대비 3 / 1). 비용 v2 1.53배 |
 
 각 실험의 자세한 내용은 `experiments/NNN-*.md`에 있다. 여기에는 결정과 그 이유를 한두 줄로 남긴다.
 
@@ -374,6 +375,16 @@ _계획대로 되지 않은 일, 원인, 다시 하면 바꿀 것_
 | `dev_007_lite31`, `dev_007_flash38` | rag, 답변 모델 `gemini-3.1-flash-lite` / `gemini-3.8-flash` | 체인과 같음 | Hybrid k=5 | `answer_v1`, `judge_v1` | dev 90 |
 | `dev_004_hybrid` | rag, `gemini-3.5-flash-lite` (체인 답변 실행, 이후 카드의 기준) | structure + 900/112 | Hybrid α=0.5 k=5 | `answer_v1`, `judge_v1` | dev 90 |
 | `dev_002_structure_retrieval` | 검색만 | structure (용어집·약관), 나머지 800/100 | 같음 | – | 같음 |
+| `dev_011_lite_v2`, `dev_011b_lite_v3`, `dev_011c_lite_v4` | rag, `gemini-3.5-flash-lite` | 구조 단위 + 나머지 Recursive 950/119 | Hybrid k=5 | `answer_v2` / `v3` / `v4`, `judge_v1` | dev 90 (카드 011) |
+| `dev_012_flash36_v4` | rag, `gemini-3.6-flash` | 같음 | Hybrid k=5 | `answer_v4`, `judge_v1` | dev 90 (카드 012) |
+| `dev_013_rerank_flash36_fix`, `dev_013b_rerank_lite_fix` | rag, `gemini-3.6-flash` / `gemini-3.5-flash-lite` | 같음 | Hybrid 후보 15 → LLM rerank 5 (`rerank_v1`, 재순위 모델 = 답변 모델) | `answer_v4`, `judge_v1` | dev 90 (카드 013, T2·T4의 dev 값) |
+| `dev_008b_agent950` | agent (T3 그래프), `gemini-3.6-flash` | 같음 | rerank 체인 + 재검색 ≤2 | `answer_v4`, agent_*_v1, `judge_v1` | dev 90 (카드 014 비교용, test 뒤 실행) |
+| `dev_014_agent_v2` | agent v2 (+ 메모, 답변 검사 `gemini-3.8-flash`, 고쳐 쓰기 ≤1) | 같음 | 같음 | `answer_v5`, agent_*_v1, `agent_check_v1`, `judge_v1` | dev 90 (카드 014) |
+| `test_000_baseline`, `test_000_baseline_self2` | T1 (`configs/baseline.yaml`) | Recursive 800/100 | vector k=5 | `answer_v1`, `judge_v1` | 제공 test 90 + 폐기한 자작 20 / self2 41 |
+| `test_013_rerank_flash36`, `test_013_rerank_flash36_self2` | T2 (`configs/013-rerank-flash36.yaml`) | 구조 단위 + 950/119 | Hybrid 15 → rerank 5 | `answer_v4`, `judge_v1` | 같음 |
+| `test_008b_agent950`, `test_008b_agent950_self2` | T3 (`configs/008b-agent-950.yaml`) | 같음 | 같음 + 재검색 ≤2 | `answer_v4`, agent_*_v1, `judge_v1` | 같음 |
+| `test_013b_rerank_lite` | T4 최종 (`configs/013b-rerank-lite.yaml`) | 같음 | Hybrid 15 → rerank 5 | `answer_v4`, `judge_v1` | 제공 test 90 + 폐기한 자작 20 + self2 41 (151, 결과는 90 + 41만 씀) |
+| `test_014_agent_v2_self2` | Agent v2 (카드 014, 채택 안 함) | 같음 | 같음 | `answer_v5`, `agent_check_v1`, `judge_v1` | self2 41 |
 
 LLM 호출 장부:
 

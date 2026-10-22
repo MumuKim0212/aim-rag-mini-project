@@ -58,6 +58,19 @@ python scripts/report.py                                                     # �
 # 최종 시스템 인덱스 구축
 python scripts/build_index.py --config configs/013b-rerank-lite.yaml
 
+# 최종 시스템(T4)과 Agent(T3)를 dev에서 실행·채점·평가 (Agent도 같은 인덱스를 쓴다)
+# 같은 이름의 실행이 out/runs.db에 있으면 끝난 문항은 건너뛴다. 새로 재려면 --name으로 새 이름을 준다
+# (dev_013b_rerank_lite는 프롬프트 오류로 무효인 첫 실행이라 이름을 바꿔 쓴다)
+python scripts/run.py --config configs/013b-rerank-lite.yaml --split dev --name dev_013b_rerank_lite_again
+python scripts/run.py --config configs/008b-agent-950.yaml --split dev
+python scripts/grade.py --experiment dev_008b_agent950
+python scripts/evaluate.py --experiment dev_008b_agent950 --with-runs
+python scripts/compare.py dev_013_rerank_flash36_fix dev_008b_agent950 --noise 14   # 문항별 짝비교 + 비용 비교
+
+# 최종 test 재현 (워크플로우 8단계, 이미 실행함. 다시 돌리면 test를 또 보게 된다)
+python scripts/run.py --config configs/013b-rerank-lite.yaml --split test --final
+python scripts/run.py --config configs/013b-rerank-lite.yaml --split test --final --sets self2 --name test_013b_rerank_lite_self2
+
 # 변형 실험: LLM 없이 검색만 비교
 python scripts/run.py --config configs/004-hybrid.yaml --split dev --retrieval-only
 python scripts/evaluate.py --experiment dev_004_hybrid_retrieval

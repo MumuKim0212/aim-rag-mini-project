@@ -1,4 +1,4 @@
-"""Guards for the self-written golden set (golden/self2.jsonl, made by scratch/make_self2.py)."""
+"""Guards for the self-written golden set (golden/self2.jsonl, made by scripts/make_self2.py)."""
 
 import json
 

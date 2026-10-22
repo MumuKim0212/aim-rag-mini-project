@@ -9,7 +9,7 @@ Keep guide comment in place after filling in.
 
 # 002: Structure-unit chunking vs Recursive (H1)
 
-Status: llm-free done (gates passed except headroom; answer run needs an explicit waiver from the project owner)
+Status: superseded (answer run waived and done in card 002b; structure chunking adopted by the owner 2026-10-21). Original: llm-free done (gates passed except headroom; answer run needs an explicit waiver from the project owner)
 Date: 2026-10-21
 
 ## 1. Hypothesis
