@@ -85,10 +85,14 @@ python scripts/compare.py dev_000_baseline dev_004_hybrid_retrieval --metric gol
 ## 화면으로 보기 (Streamlit)
 
 ```bash
-streamlit run app/streamlit_app.py     # 요약, 전체 흐름, 점수가 오른 과정, 청킹, 질문 따라가기(실시간 API 호출), 최종 시험, 문항별 결과
+streamlit run app/streamlit_app.py     # 요약, 동작 방식, 직접 검색해서 써보기(실시간), 점수가 오른 과정, 청킹, 최종 시험, 문항별 결과, 배운 점, 용어
 ```
 
 의존성은 `requirements.txt`의 `streamlit`이다. 실시간 페이지는 인덱스(`out/index/`)와 `GOOGLE_API_KEY`가 있어야 하고, 나머지 페이지는 `results/`만 읽는다.
+
+"직접 검색해서 써보기"는 질문을 넣으면 최종 시스템·개선판·Agent·Agent v2 중 하나로 답하고, 지나간 칸(노드)과 순서를 그래프에 실시간으로 그린다(LangGraph `stream`). 질문당 약 0.004~0.02달러.
+
+그림 자료: [submission/시각화 자료.pdf](submission/시각화%20자료.pdf) (원본 `submission/시각화 자료.html`, 크롬으로 PDF 인쇄).
 
 ## 협업
 
