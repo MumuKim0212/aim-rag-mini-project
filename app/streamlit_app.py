@@ -30,7 +30,8 @@ from rag.retrieval import index_dir  # noqa: E402
 
 CFG_LITE = "configs/013b-rerank-lite.yaml"      # final system (T4): gemini-3.5-flash-lite + prompt v4 + rerank
 CFG_REPAIR = "configs/015-context-repair.yaml"  # LimDaeJin's card 015: T3 agent + context repair
-# Henry's final setup (configs/011-lite31-prompt2.yaml on branch Henry) needs his own chunking / retrieval / prompt code,
+CFG_BEST = "configs/018-b-rerank-flash36.yaml"  # Henry's best setting (card 018): gemini-3.8-flash answer + gemini-3.6-flash rerank
+# Henry's earlier setup (configs/011-lite31-prompt2.yaml on branch Henry) needs his own chunking / retrieval / prompt code,
 # so it runs in a separate checkout of that commit (app/run_checkout.py), next to this repo
 HENRY_DIR, HENRY_COMMIT, CFG_HENRY = ROOT.parent / "rag_mini_project-henry", "a39a5e3", "configs/011-lite31-prompt2.yaml"
 CFG_BASE = "configs/baseline.yaml"
@@ -329,7 +330,7 @@ EXAMPLES = [("POS001", "보통 질문"), ("NEG037", "다시 찾기가 일어나�
 # one version per teammate; the flow drawn on the live page follows the kind
 SYSTEMS = {"★ Serin-91 · 최종 시스템 T4 (작은 AI, 칸 3개)": ("rag", CFG_LITE),
            "LimDaeJin · 근거 복구 Agent (카드 015, 큰 AI)": ("repair", CFG_REPAIR),
-           "Henry · 기본 RAG + 구조 청킹 (카드 011, 작은 AI 3.1)": ("checkout", CFG_HENRY)}
+           "Henry · 가장 높은 점수 설정 (카드 018, 큰 AI 3.8 + 고르기 3.6, 칸 3개)": ("rag", CFG_BEST)}
 FLOWS = {"rag": (RAG_NODES, RAG_EDGES), "repair": (REPAIR_NODES, REPAIR_EDGES), "checkout": (HENRY_NODES, HENRY_EDGES)}
 # golden-set groups offered on the live page; the archived 20-question draft (set "self") is left out
 GOLDEN_GROUPS = {"제공 세트 · 연습(dev) 90문항": lambda i: i["split"] == "dev",
@@ -505,7 +506,20 @@ def run_rag_live(cfg_path: str, question: str, scope: str, graph_slot, log):
             "steps": steps, "searches": 1, "reason": "정상적으로 끝났어요", "path": path}
 
 
-def saved_accuracy(kind: str) -> str:
+def best_test_accuracy() -> str:
+    """Card 018: the provided test 90 questions, run once; T4 is compared on the same questions."""
+    new = {m["qid"]: m["correctness"] for m in jsonl(str(RESULTS / "test_018_b_rerank_flash36/metrics.jsonl"))}
+    t4 = {m["qid"]: m["correctness"] for m in jsonl(str(RESULTS / "test_013b_rerank_lite/metrics.jsonl")) if m["qid"] in new}
+    if not new or len(t4) != len(new):
+        return "저장된 정확도: 결과 파일 없음"
+    return (f"저장된 정확도 (0~1): 시험 문제 {len(new)}문항 **{sum(new.values()) / len(new) / 2:.3f}** "
+            f"(같은 문항에서 최종 시스템 T4는 {sum(t4.values()) / len(t4) / 2:.3f}). 한 번 돌린 결과이고 이 결과를 보고 고른 설정이라 "
+            "실제보다 높게 나왔을 수 있어요. 비용은 T4의 약 2.4배, 응답은 약 3배 느립니다.")
+
+
+def saved_accuracy(kind: str, cfg_path: str) -> str:
+    if cfg_path == CFG_BEST:
+        return best_test_accuracy()
     if kind == "rag":
         f = final_stats("T4")
         return (f"저장된 정확도 (0~1): 연습 90문항 **{score('dev_013b_rerank_lite_fix'):.3f}** · "
@@ -536,7 +550,7 @@ def live_run(mode: str, question: str | None, scope: str, area, wide: bool, item
     """Draw one version's flow, step cards and final answer into `area`; question None draws the empty flow.
     With a golden item the answer is graded by the judge."""
     kind, cfg_path = SYSTEMS[mode]
-    area.caption(saved_accuracy(kind))
+    area.caption(saved_accuracy(kind, cfg_path))
     with area:
         left, right = st.columns([5, 6]) if wide else (st.container(), st.container())
     with left:
@@ -647,6 +661,7 @@ def saved_breakdown(run_dir: str, cfg_path: str | None = None) -> dict:
 def team_notes():
     st.divider()
     st.header("👥 팀원 버전 한눈에 비교")
+    st.caption("아래 표와 글의 Henry 열은 연습 문제 결과가 저장된 카드 011 버전(작은 AI 3.1, 뜻 검색 5개)입니다. 위 목록의 Henry 버전(카드 018)은 연습 문제를 돌리지 않아 여기에 넣지 못했습니다.")
     t4 = saved_breakdown(str(RESULTS / "dev_013b_rerank_lite_fix"), CFG_LITE)
     t3 = saved_breakdown(str(RESULTS / "dev_008b_agent950"))
     t2 = saved_breakdown(str(RESULTS / "dev_013_rerank_flash36_fix"), CFG_LITE)  # same index as T4
@@ -725,7 +740,8 @@ def page_live():
                             placeholder="예: 휴면성 증권계좌는 어떤 계좌인가요?  /  주택연금은 몇 살부터 가입할 수 있나요?")
     view = st.radio("어느 버전으로 답할까요?", ["⇄ 세 버전 나란히 비교"] + list(SYSTEMS), index=0,
                     help="Serin-91 버전은 제출한 최종 시스템(T4)입니다. LimDaeJin 버전은 근거가 부족한 이유를 진단해 잘린 조각을 페이지 전체로 넓히는 Agent, "
-                         "Henry 버전은 구조 단위로 자른 조각 5개를 뜻 검색으로 찾아 작은 AI(gemini-3.1-flash-lite)가 답하는 기본 RAG입니다.")
+                         "Henry 버전은 이번 실험(카드 018)에서 시험 점수가 가장 높았던 설정입니다. T4와 같은 3칸(후보 15개 → AI가 5개 고르기 → 답 쓰기)인데 "
+                         "고르는 AI는 gemini-3.6-flash, 답하는 AI는 gemini-3.8-flash로 바꿨습니다. 제출한 최종 시스템은 아닙니다.")
     default_scope = scope_of(item, cfg_of(CFG_LITE)) if item else "B"
     scope = st.radio("찾을 문서", ["B", "A"], index=0 if default_scope == "B" else 1, horizontal=True,
                      format_func=lambda s: "전체 23개 문서" if s == "B" else "용어집·약관만 (기본 문제 세트의 조건)")
