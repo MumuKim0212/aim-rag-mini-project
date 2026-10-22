@@ -35,7 +35,8 @@ cols = st.columns(min(len(sel), 3))
 for n, a in enumerate(sel, 1):
     with cols[(n - 1) % len(cols)]:
         st.subheader(f"{n}. {a['label']}")
-        st.caption(f"설정 {a['config']} · 커밋 {a['commit']} · 답변 모델 {a['answer_model']}")
+        st.caption(f"출처: GitHub `origin/{a['branch']}` 커밋 {a['commit']} · 설정 `configs/{a['config']}` · "
+                   f"만든 사람 {a.get('maker', '-')} · 답변 모델 {a['answer_model']}")
         try:
             text = A.translate(graph_text(a["sha"], a["config"]))
         except Exception as e:
@@ -43,6 +44,7 @@ for n, a in enumerate(sel, 1):
             continue
         show_mermaid(text)
         nodes = [line.split("(")[0].strip() for line in text.splitlines()
-                 if "(" in line and "-->" not in line and "-.->" not in line and not line.strip().startswith(("class", "graph"))]
-        st.caption("노드: " + " → ".join(A.NODES.get(x, x).split("<br>")[0] for x in nodes if x not in ("__start__", "__end__")))
+                 if "(" in line and "-->" not in line and "-.->" not in line and "-. " not in line
+                 and not line.strip().startswith(("classDef", "class ", "graph"))]
+        st.caption("노드: " + " → ".join(A.NODES.get(x, x).replace("<br>", " ") for x in nodes if x not in ("__start__", "__end__")))
         st.caption(a["description"])

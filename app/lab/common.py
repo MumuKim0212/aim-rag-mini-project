@@ -78,17 +78,28 @@ def result_dir(exp: str) -> Path:
 
 # ---------------------------------------------------------------- agents picked on 1. 데이터 > agent_list
 
+FETCH_EVERY_S = 300
+
+
 def branch_agents(force: bool = False) -> list[dict]:
-    """Newest agent on each origin branch; looked up once per browser session (every app start) or on demand."""
-    if force or "branch_agents" not in st.session_state:
+    """Newest own agent on each origin branch. GitHub is fetched on app start, on demand and every 5 minutes;
+    the list itself is rebuilt from the per-commit cache whenever the fetch or the selection rules
+    (scripts/branch_agents.py) changed, so an open tab never keeps an entry made under older rules."""
+    import time
+    now = time.time()
+    if force or now - st.session_state.get("branch_agents_fetched", 0) > FETCH_EVERY_S:
         with st.spinner("GitHub 브랜치에서 agent를 조회하는 중…"):
             try:
-                found, note = BA.scan(fetch=True), ""
+                BA.scan(fetch=True)
+                st.session_state.branch_agents_note = ""
             except Exception as e:
-                found, note = BA.scan(fetch=False), f"GitHub에 연결하지 못해 마지막으로 받은 정보로 보여 줍니다 ({type(e).__name__})."
-        st.session_state.branch_agents = BA.latest_per_branch(found)
-        st.session_state.branch_agents_note = note
+                st.session_state.branch_agents_note = f"GitHub에 연결하지 못해 마지막으로 받은 정보로 보여 줍니다 ({type(e).__name__})."
+        st.session_state.branch_agents_fetched = now
         st.session_state.branch_agents_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+    stamp = (st.session_state.branch_agents_fetched, Path(BA.__file__).stat().st_mtime)
+    if st.session_state.get("branch_agents_stamp") != stamp:
+        st.session_state.branch_agents = BA.latest_per_branch(BA.scan(fetch=False))
+        st.session_state.branch_agents_stamp = stamp
     return st.session_state.branch_agents
 
 
