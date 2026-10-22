@@ -12,4 +12,4 @@
 | 비교 실험 결과 | 실험 카드 `experiments/`, 요약 [PROCESS.md](PROCESS.md) 7절, 최종 비교 [EVALUATION.md](EVALUATION.md) | 완료 |
 | 실패 사례와 개선점 | [PROCESS.md](PROCESS.md) 6·10절, [EVALUATION.md](EVALUATION.md) | 완료 |
 | 회고 (과제 목록 밖, 추가) | [RETROSPECTIVE.md](RETROSPECTIVE.md) | 작성됨 (2026-10-22) |
-| 시각화 자료 (과제 목록 밖, 추가): 최종 시스템(T4) 구조와 기술, 점수가 오른 과정, 최종 시험 결과, 기본 RAG 대 Agent(T3) 비교와 실제로 지나간 길, 효과가 없던 시도(v2 등) | [시각화 자료.pdf](시각화%20자료.pdf) (원본 `시각화 자료.html`) | 작성됨 (2026-10-22) |
+| 시각화 자료 (과제 목록 밖, 추가): 최종 시스템(T4) 구조와 기술, 점수가 오른 과정, 최종 시험 결과, 최종 시스템이 실제로 지나간 길(연습 문제 1개), 기본 RAG 대 Agent(T3) 비교, 효과가 없던 시도(v2 등) | [시각화 자료.pdf](시각화%20자료.pdf) (원본 `시각화 자료.html`) | 작성됨 (2026-10-22) |
