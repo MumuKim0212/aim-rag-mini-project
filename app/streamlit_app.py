@@ -590,7 +590,7 @@ def refresh_agents(force: bool = False) -> list[dict]:
         st.session_state.branch_agents_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     stamp = (st.session_state.branch_agents_fetched, Path(BA.__file__).stat().st_mtime)
     if st.session_state.get("branch_agents_stamp") != stamp:
-        st.session_state.branch_agents = BA.latest_per_branch(BA.scan(fetch=False))
+        st.session_state.branch_agents = BA.distinct_agents(BA.scan(fetch=False))[0]  # each distinct agent once
         st.session_state.branch_agents_stamp = stamp
     return st.session_state.branch_agents
 

@@ -3,31 +3,65 @@ import pandas as pd
 import streamlit as st
 
 
-from lab.common import ROOT, agent_bars, chunk_frame, kpi_row, pages, picked, picked_note, picked_runs, styled, summary
+from lab.common import BA, ROOT, agent_bars, chunk_frame, colors, kpi_row, pages, picked, picked_note, picked_runs, styled
 
 st.title("✂️ 청킹 방식별 청크")
 st.caption("같은 페이지 텍스트를 청킹 방식마다 어떻게 나누는지 비교합니다. 코드로 바로 청킹하므로 API를 쓰지 않습니다.")
 picked_note()
+@st.cache_data(show_spinner="그 브랜치 코드로 청킹하는 중… (agent마다 처음 한 번 5~10초)")
+def agent_chunks(sha: str, config: str) -> list[dict]:
+    return BA.chunks_of(sha, config)
+
+
 if picked():
-    st.subheader("🤖 선택한 agent의 청킹 비교")
+    st.subheader("🤖 선택한 agent별 청킹")
+    st.caption("각 agent의 브랜치 코드(그 브랜치의 chunking.py)와 그 agent 설정으로 같은 페이지(범위 B 전체)를 직접 청킹한 결과입니다.")
+    sel = picked()
+    names = [f"{n}. {a['label']}" for n, a in enumerate(sel, 1)]
+    ch_by = {name: agent_chunks(a["sha"], a["config"]) for name, a in zip(names, sel)}
+    stat = {}
+    for name, a in zip(names, sel):
+        c, lens = a["chunking"], pd.Series([x["chars"] for x in ch_by[name]])
+        stat[name] = {"청킹 방식": c.get("method"), "크기 / 겹침": f"{c.get('chunk_size')} / {c.get('chunk_overlap')}",
+                      "조항 최대 글자": c.get("max_chars", "–"), "머리말": c.get("add_header", False), "청크 수": len(lens),
+                      "평균 길이": round(lens.mean()), "중앙값": int(lens.median()), "최대": int(lens.max()),
+                      "페이지를 넘는 청크": sum(len(x["pages"]) > 1 for x in ch_by[name]),
+                      "만든 사람 · 커밋": f"{a.get('maker', '-')} · {a['commit']}"}
+    st.dataframe(pd.DataFrame(stat).astype(str), width="stretch")
+    if len(sel) >= 2:
+        base = {(x["chunk_id"], x["content"]) for x in ch_by[names[0]]}
+        for name in names[1:]:
+            other = {(x["chunk_id"], x["content"]) for x in ch_by[name]}
+            same = len(base & other)
+            (st.success if same == len(base) == len(other) else st.info)(
+                f"{names[0]} 와 {name}: 청크 {len(base):,}개 / {len(other):,}개 중 {same:,}개가 완전히 같습니다"
+                + (" → 두 agent의 청킹은 똑같습니다(차이는 검색 이후 단계에서 납니다)." if same == len(base) == len(other) else "."))
+    dist = pd.DataFrame([{"agent": name, "길이": x["chars"]} for name in names for x in ch_by[name]])
+    st.altair_chart(alt.Chart(dist).mark_bar(opacity=0.55).encode(
+        x=alt.X("길이:Q", bin=alt.Bin(maxbins=40), title="청크 길이 (글자)"), y=alt.Y("count()", stack=None, title="청크 수"),
+        color=alt.Color("agent:N", scale=colors(names), title=None)), width="stretch")
+
+    st.markdown("**같은 페이지를 agent마다 어떻게 나눴는지**")
+    files = sorted({x["source"] for x in ch_by[names[0]]})
+    c1, c2 = st.columns([3, 1])
+    file = c1.selectbox("문서", files, key="agent_chunk_file")
+    pages_ = sorted({x["page"] for name in names for x in ch_by[name] if x["source"] == file})
+    page = c2.selectbox("시작 페이지", pages_, key="agent_chunk_page")
+    cols = st.columns(len(names))
+    for col, name in zip(cols, names):
+        with col:
+            here = [x for x in ch_by[name] if x["source"] == file and x["page"] == page]
+            st.markdown(f"**{name}** · {len(here)}개")
+            for x in here:
+                with st.expander(f"{x['chars']}자 · 쪽 {x['pages']}"):
+                    st.text(x["content"])
+
     runs = picked_runs()
-    by_label = {r["label"]: r for r in runs}
-    settings = {}
-    for n, a in enumerate(picked(), 1):
-        ch, r = a["chunking"], by_label.get(a["label"])
-        rt = (summary(r["experiment"]).get("config") or {}).get("retrieval", {}) if r else {}
-        settings[f"{n}. {a['label']}"] = {"청킹 방식": ch.get("method"), "크기 / 겹침": f"{ch.get('chunk_size')} / {ch.get('chunk_overlap')}",
-                                          "조항 최대 글자": ch.get("max_chars", "–"), "머리말": ch.get("add_header", False),
-                                          "검색": rt.get("method", "–"), "k / 재정렬 후보": f"{rt.get('k', '–')} / {rt.get('rerank_pool') or '–'}"}
-    st.markdown("**설정** (각 agent 브랜치의 config 값)")
-    st.dataframe(pd.DataFrame(settings).astype(str), width="stretch")
     if runs:
         df, common = chunk_frame(runs)
         st.markdown(f"**실행 결과로 본 청킹 수치** (함께 푼 dev 문항 {len(common)}개, agent마다 한 열)")
         st.dataframe(styled(df, "{:,.3f}"), width="stretch")
         agent_bars(df, ["정답 페이지 포함", "근거 문장 포함률", "문항당 넘긴 조각 수", "조각 평균 길이", "문항당 문맥 글자 수"])
-        st.caption("정답 페이지 포함·근거 문장 포함률은 높을수록 좋습니다. 조각 수·길이·문맥 글자 수는 좋고 나쁨이 아니라 "
-                   "청킹 방식의 차이를 보여 줍니다(길수록 근거는 많이 담지만 비용이 늘어남).")
     st.divider()
 
 CHUNKERS = {

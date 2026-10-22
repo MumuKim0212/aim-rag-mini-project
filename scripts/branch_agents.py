@@ -165,6 +165,22 @@ def latest_per_branch(agents: list[dict]) -> list[dict]:
             for a in sorted(best.values(), key=lambda a: a["added"], reverse=True)]
 
 
+def distinct_agents(agents: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Each distinct agent once. Branches that merged the same agent (same config and implementation file) carry
+    a duplicate: keep the one on its maker's own branch (newest such branch), else the newest branch. Returns
+    (shown, hidden); a hidden entry has 'same_as' = the label it duplicates."""
+    latest, groups = latest_per_branch(agents), {}
+    for a in latest:
+        groups.setdefault(a["origin_key"], []).append(a)
+    shown, hidden = [], []
+    for group in groups.values():
+        own = [a for a in group if a["author"] == a["maker"]]
+        keep = max(own or group, key=lambda a: a["date"])
+        shown.append(keep)
+        hidden += [{**a, "same_as": keep["label"]} for a in group if a is not keep]
+    return sorted(shown, key=lambda a: a["added"], reverse=True), hidden
+
+
 # ---------------------------------------------------------------- run
 
 MAX_PARALLEL = 3          # agent runs at once (each answers 4 questions at a time); the rest wait as "queued"
@@ -410,6 +426,27 @@ def graph_of(sha: str, config: str) -> str:
     """draw_mermaid() of the agent graph on that commit (no API calls)."""
     return in_checkout(sha, config, 'print(json.dumps({"mermaid": agent.graph.get_graph().draw_mermaid()}))',
                        timeout=120)["mermaid"]
+
+
+CHUNKS = HOME / "chunks"
+
+
+def chunks_of(sha: str, config: str, scope: str = "B") -> list[dict]:
+    """The chunks that commit's own chunking code makes with that config (no API calls), cached per commit:
+    [{chunk_id, source, page, pages, chars, content}]. The same pages as its index build (indexable, in scope)."""
+    path = CHUNKS / f"{sha[:10]}_{config.removesuffix('.yaml')}_{scope}.json"
+    if not path.exists():
+        CHUNKS.mkdir(parents=True, exist_ok=True)
+        body = (
+            "from rag import ROOT\nfrom rag.chunking import chunk_pages\nfrom rag.ingest import in_scope, indexable, load_pages\n"
+            "cfg = agent.cfg\n"
+            f"pages = [p for p in load_pages(ROOT / cfg['corpus']['pages']) if indexable(p, cfg) and in_scope(p, cfg, {scope!r})]\n"
+            "out = [{'chunk_id': c['chunk_id'], 'source': c['source'], 'page': c['page'], 'pages': c.get('pages') or [c['page']],\n"
+            "        'chars': len(c['content']), 'content': c['content']} for c in chunk_pages(pages, cfg)]\n"
+            f"open({str(path)!r}, 'w', encoding='utf-8').write(json.dumps(out, ensure_ascii=False))\n"
+            "print(json.dumps({'n': len(out)}))")
+        in_checkout(sha, config, body, timeout=300)
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def live_run(sha: str, config: str, question: str, scope: str) -> dict:

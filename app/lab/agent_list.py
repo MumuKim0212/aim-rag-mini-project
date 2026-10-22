@@ -1,11 +1,12 @@
 import pandas as pd
 import streamlit as st
 
-from lab.common import BA, branch_agents, latest_run, picked_runs
+from lab.common import BA, branch_agents, duplicate_agents, latest_run, picked_runs
 
 st.title("🤖 agent_list")
-st.caption("GitHub 저장소 aim-rag-mini-project의 모든 브랜치(main 포함)에서 커밋된 agent를 찾아, 브랜치마다 가장 최근에 올라온 "
-           "agent 하나만 보여 줍니다. 고른 agent는 아래 메뉴(청킹·실험·에이전트·최종 평가·문항별 결과)에 자동으로 함께 나옵니다.")
+st.caption("GitHub 저장소 aim-rag-mini-project의 모든 브랜치(main 포함)에서 커밋된 agent를 찾아, 브랜치마다 가장 최근 agent를 고른 뒤 "
+           "같은 agent가 여러 브랜치에 있으면(병합·복사) 만든 사람의 브랜치에서 한 번만 보여 줍니다. 고른 agent는 아래 메뉴"
+           "(청킹·실험·에이전트·최종 평가·문항별 결과)에 자동으로 함께 나옵니다.")
 
 c1, c2 = st.columns([4, 1])
 if c2.button("🔄 목록 새로고침", width="stretch"):
@@ -33,6 +34,12 @@ picked_now = [a["label"] for a, on in zip(agents, edited["선택"]) if on]
 if picked_now != st.session_state.get("picked_agents"):
     st.session_state.picked_agents = picked_now
     st.rerun()
+dups = duplicate_agents()
+if dups:
+    with st.expander(f"자기 agent가 없는 브랜치 {len(dups)}개 (같은 agent를 병합으로 가지고 있어 목록에서 한 번만 보여 줌)"):
+        st.dataframe(pd.DataFrame([{"브랜치": d["branch"], "커밋": d["commit"], "브랜치 마지막 커밋": d["author"],
+                                    "가지고 있는 agent": d["config"].removesuffix(".yaml"), "만든 사람": d["maker"],
+                                    "목록에서는": d["same_as"]} for d in dups]), hide_index=True, width="stretch")
 st.caption("'만든 사람'은 그 agent 설정을 처음 커밋한 사람입니다. 다른 사람의 agent 파일을 비교용으로 복사해 온 것은 "
            "그 브랜치의 agent로 치지 않고, 브랜치마다 그 브랜치에 원래 있던 agent 중 가장 최근 것을 보여 줍니다.")
 st.caption("'결과'는 이 PC에서 지금 목록의 agent(같은 코드·설정)를 마지막으로 실행한 결과(dev)입니다. 브랜치에 새 커밋이 올라와 "

@@ -98,9 +98,16 @@ def branch_agents(force: bool = False) -> list[dict]:
         st.session_state.branch_agents_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     stamp = (st.session_state.branch_agents_fetched, Path(BA.__file__).stat().st_mtime)
     if st.session_state.get("branch_agents_stamp") != stamp:
-        st.session_state.branch_agents = BA.latest_per_branch(BA.scan(fetch=False))
+        shown, hidden = BA.distinct_agents(BA.scan(fetch=False))
+        st.session_state.branch_agents, st.session_state.branch_agents_dup = shown, hidden
         st.session_state.branch_agents_stamp = stamp
     return st.session_state.branch_agents
+
+
+def duplicate_agents() -> list[dict]:
+    """Branches whose newest agent is the same as one listed (merged from its maker's branch)."""
+    branch_agents()
+    return st.session_state.get("branch_agents_dup", [])
 
 
 def picked() -> list[dict]:
@@ -115,6 +122,14 @@ def latest_run(entry: dict, exact: bool = True) -> dict | None:
              and r["config"] == entry["config"] and (BA.RESULTS / r["experiment"] / "summary.json").exists()
              and (not exact or r.get("same_code_id") == entry["same_code_id"])]
     return max(rows_, key=lambda r: r["started"]) if rows_ else None
+
+
+def all_runs(entry: dict) -> list[dict]:
+    """Every finished run of this agent (identical code and config), oldest first."""
+    rows_ = [r for r in BA.read_log() if r["status"] == "done" and r["branch"] == entry["branch"]
+             and r["config"] == entry["config"] and r.get("same_code_id") == entry["same_code_id"]
+             and (BA.RESULTS / r["experiment"] / "summary.json").exists()]
+    return sorted(rows_, key=lambda r: r["started"])
 
 
 def picked_runs() -> list[dict]:

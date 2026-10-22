@@ -1,12 +1,35 @@
 import pandas as pd
 import streamlit as st
 
-from lab.common import agent_bars, picked_note, picked_runs, styled, summary
+from lab.common import SETS, agent_bars, chunk_frame, compare_runs, picked_note, picked_runs, rows, styled, summary
 
 st.title("🧪 청킹·검색 비교 (LLM 사용 후)")
 st.caption("검색만 비교한 실험(LLM 없이) 중 실제로 LLM이 답을 쓰고 채점까지 한 실험들입니다. 같은 청킹·검색 설정을 "
            "LLM 없이 잰 수치(검색 상위 5개)와 LLM 답변 점수를 한 표에 놓아, 검색 지표가 오른 만큼 답도 좋아졌는지 봅니다.")
 picked_note()
+
+runs = picked_runs()
+if runs:
+    st.subheader("🤖 선택한 agent별 결과 (LLM이 답하고 채점한 뒤)")
+    llm, grades, common = compare_runs(runs)
+    ret, _ = chunk_frame(runs)
+    both = pd.concat([llm, ret.loc[["정답 페이지 포함", "MRR", "문항당 문맥 글자 수"]]])
+    st.dataframe(styled(both, "{:,.3f}"), width="stretch")
+    agent_bars(both, ["정답 점수", "완전 정답률", "근거 문장 포함률", "정답 페이지 포함", "USD/문항", "p90 초"], height=150)
+    by_set = {}
+    for r in runs:
+        g = {x["qid"]: x["correctness"] for x in rows(r["experiment"], "grades.jsonl")}
+        m = {x["qid"]: x["set"] for x in rows(r["experiment"], "metrics.jsonl")}
+        sets = {}
+        for q in common:
+            sets.setdefault(SETS.get(m[q], m[q]), []).append(g[q] / 2)
+        by_set[r["name"]] = {f"{k} ({len(v)}문항)": sum(v) / len(v) for k, v in sets.items()}
+    st.markdown("**질문 묶음별 정답 점수** (agent마다 한 열)")
+    st.dataframe(styled(pd.DataFrame(by_set)), width="stretch")
+    st.caption(f"함께 푼 dev 문항 {len(common)}개 기준 · 초록 = 가장 좋은 agent, 빨강 = 가장 나쁜 agent. "
+               "agent는 각자 브랜치 코드로 같은 문항을 답하고 같은 채점 기준으로 채점했습니다.")
+    st.divider()
+    st.subheader("팀 실험: 청킹·검색을 바꾸고 답까지 채점한 실행")
 
 # answered chunking / retrieval experiments, in the order they were adopted; the twin is its --retrieval-only run
 RUNS = [
@@ -34,23 +57,12 @@ for name, exp, twin in RUNS:
         "출처 일치율": sc["citation_on_target"], "근거 문장 포함률": rt.get("evid@5"), "정답 페이지 포함": rt.get("page_hit@5"),
         "USD/문항": co["usd_per_question"], "p90 초": la["p90"],
         "답변 모델": (cfg.get("answer") or {}).get("model", "").replace("gemini-", ""), "실험": exp}
-for r in picked_runs():  # the agents picked on agent_list, answered and graded the same way
-    s = summary(r["experiment"])
-    sc, rt, co, la, cfg = s["scores"], s["retrieval"], s["cost"], s["latency_s"], s.get("config") or {}
-    cols["🤖 " + r["name"]] = {
-        "LLM 없이: 정답 페이지 포함": None, "LLM 없이: 근거 문장 포함률": None,
-        "정답 점수": sc["correctness_mean"], "완전 정답률": sc["fully_correct"], "대응 일치율": sc["status_ok"],
-        "출처 일치율": sc["citation_on_target"], "근거 문장 포함률": rt.get("evid"), "정답 페이지 포함": rt.get("page_hit"),
-        "USD/문항": co["usd_per_question"], "p90 초": la["p90"],
-        "답변 모델": (cfg.get("answer") or {}).get("model", "").replace("gemini-", ""), "실험": r["experiment"]}
-
 df = pd.DataFrame(cols)
 num = df.drop(index=["답변 모델", "실험"])
 st.dataframe(styled(num.apply(pd.to_numeric, errors="coerce")), width="stretch")
 st.dataframe(df.loc[["답변 모델", "실험"]], width="stretch")
-st.caption("열 = 실험(🤖는 agent_list에서 고른 agent), 초록 = 가장 좋은 값, 빨강 = 가장 나쁜 값. 위 두 줄은 LLM 없이 잰 검색 지표"
-           "(그 설정의 --retrieval-only 실행, 상위 5개), 나머지는 LLM이 답하고 채점한 결과입니다. dev 90문항 기준이며 🤖 agent는 "
-           "agent_list에서 실행한 문항 수 기준이라 문항 수가 다를 수 있습니다.")
+st.caption("열 = 실험, 초록 = 가장 좋은 값, 빨강 = 가장 나쁜 값. 위 두 줄은 LLM 없이 잰 검색 지표(그 설정의 --retrieval-only "
+           "실행, 상위 5개), 나머지는 LLM이 답하고 채점한 결과입니다(dev 90문항).")
 
 agent_bars(num.apply(pd.to_numeric, errors="coerce"),
            ["정답 점수", "완전 정답률", "근거 문장 포함률", "LLM 없이: 근거 문장 포함률", "USD/문항"], height=150)
