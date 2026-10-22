@@ -30,9 +30,10 @@ def rerank(question: str, pool: list[dict], k: int, model: str, cfg: dict, steps
     ranked, failed = [], False
     try:
         a = cfg["answer"]
+        thinking = cfg.get("retrieval", {}).get("rerank_thinking_level") or a.get("thinking_level")  # card 017: keep the rerank fixed when the answer's thinking changes
         ranked = llm.generate_json(model=model, system=fill(prompt["system"], k=str(k)),
                                    user=fill(prompt["user"], question=question, context=context, k=str(k)),
-                                   schema=RerankOut, temperature=a.get("temperature"), thinking_level=a.get("thinking_level"),
+                                   schema=RerankOut, temperature=a.get("temperature"), thinking_level=thinking,
                                    steps=steps, node="rerank", retries=cfg["run"]["max_retries"],
                                    timeout_s=cfg["run"]["timeout_s"]).ranked
     except Exception as e:  # a rerank failure must not lose the question: fall back to the pool order
