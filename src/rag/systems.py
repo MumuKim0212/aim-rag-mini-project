@@ -34,4 +34,7 @@ def build_system(cfg: dict) -> System:
     if name == "agent":
         from .agent import Agent
         return Agent(cfg)
+    if name == "agent_repair":  # card 015
+        from .agent_repair import RepairAgent
+        return RepairAgent(cfg)
     raise KeyError(f"unknown system {name!r}")
