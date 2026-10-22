@@ -1,0 +1,7 @@
+base: 001e-chunk950-chain.yaml
+name: 014_mixedchunk
+card: experiments/001e-chunk-950.md
+compare_to: dev_001e_chunk950chain
+description: "Mixed chunker (chunking_sum.py): Serin's structure units + LimDaeJin's hard cap at max_chars (_cap); no header"
+chunking:
+  hard_cap: true               # cut article pieces still over max_chars at line ends (_cap); off in every other config

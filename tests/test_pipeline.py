@@ -65,9 +65,10 @@ def test_recursive_chunks_stay_on_their_page(cfg):
     assert len(chunks) > 2 and all(len(c["content"]) <= 50 for c in chunks)
     assert chunks[-1] == {"chunk_id": f"{chunking.doc_id('a.pdf')}-p002-00", "source": "a.pdf", "page": 2,
                           "content": "짧은 쪽", "pages": [2]}
-    cfg["chunking"]["add_header"] = True
-    with pytest.raises(NotImplementedError):
-        chunking.chunk_pages(pages, cfg)
+    cfg["chunking"]["add_header"] = True  # implemented with the mixed chunker (configs/014b-mixed-chunk-header.yaml)
+    headed = chunking.chunk_pages(pages, cfg)
+    assert [c["chunk_id"] for c in headed] == [c["chunk_id"] for c in chunks]
+    assert headed[-1]["content"] == "[a | p.2]\n짧은 쪽"
 
 
 def test_build_index_and_search(tmp_path, monkeypatch, cfg, fake_llm):

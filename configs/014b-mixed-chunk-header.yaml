@@ -1,0 +1,7 @@
+base: 014-mixed-chunk.yaml
+name: 014b_mixedchunk_header
+card: experiments/001e-chunk-950.md
+compare_to: dev_001e_chunk950chain
+description: "Mixed chunker + LimDaeJin's header [document | page | article] on every chunk (add_header)"
+chunking:
+  add_header: true
