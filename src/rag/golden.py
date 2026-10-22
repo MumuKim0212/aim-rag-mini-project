@@ -16,8 +16,8 @@ from pathlib import Path
 from . import ROOT
 
 GOLDEN_DIR = ROOT / "golden"
-GOLDEN_FILES = ("provided.jsonl", "self.jsonl", "self2.jsonl")
-SETS = ("base_positive", "base_negative", "life_guide", "additional", "self", "self2")
+GOLDEN_FILES = ("provided.jsonl", "self.jsonl", "self2.jsonl", "self_v2.jsonl")
+SETS = ("base_positive", "base_negative", "life_guide", "additional", "self", "self2", "self3")
 STATUSES = ("answered", "abstained", "clarify", "refused")
 
 A, AB, C, R = {"answered"}, {"abstained"}, {"clarify"}, {"refused"}
@@ -75,7 +75,7 @@ def load_golden(split: str | None = None, sets=None, files=None, golden_dir: Pat
 
 
 # sets added after baseline.yaml was frozen (editing it would change every index key)
-EXTRA_SCOPE = {"self2": "B"}
+EXTRA_SCOPE = {"self2": "B", "self3": "B"}
 
 
 def scope_of(item: dict, cfg: dict) -> str:

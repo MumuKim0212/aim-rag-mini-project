@@ -1,0 +1,295 @@
+{
+  "experiment": "test_013b_rerank_lite_self3",
+  "card": "experiments/013-rerank.md",
+  "split": "test",
+  "system": "rag",
+  "retrieval_only": false,
+  "n_questions": 28,
+  "n_errors": 0,
+  "n_graded": 28,
+  "compare_to": "dev_011c_lite_v4",
+  "changed": {
+    "answer.prompt": {
+      "from": "prompts/answer_v1.md",
+      "to": "prompts/answer_v4.md"
+    },
+    "chunking.chunk_overlap": {
+      "from": 100,
+      "to": 119
+    },
+    "chunking.chunk_size": {
+      "from": 800,
+      "to": 950
+    },
+    "chunking.max_chars": {
+      "from": null,
+      "to": 1600
+    },
+    "chunking.method": {
+      "from": "recursive",
+      "to": "structure"
+    },
+    "retrieval.method": {
+      "from": "vector",
+      "to": "hybrid"
+    },
+    "retrieval.rerank_pool": {
+      "from": null,
+      "to": 15
+    }
+  },
+  "description": "lite + prompt v4 with LLM rerank: hybrid pool 15, lite picks 5 (card 013, R2)",
+  "config_file": "configs/013b-rerank-lite.yaml",
+  "config_hash": "eed5101be6",
+  "config": {
+    "system": "rag",
+    "corpus": {
+      "pdf_dir": "01_data",
+      "pages": "corpus/pages.jsonl",
+      "exclude_pages": {
+        "financial_glossary_readable.pdf": [
+          20,
+          25
+        ],
+        "01_매매거래계좌설정약관.pdf": [
+          7,
+          8
+        ],
+        "02_파생상품계좌설정약관.pdf": [
+          12,
+          13
+        ],
+        "03_외화증권매매거래계좌설정약관.pdf": [
+          7,
+          7
+        ],
+        "04_신용거래약관.pdf": [
+          7,
+          7
+        ],
+        "05_증권대차거래약관.pdf": [
+          8,
+          8
+        ],
+        "06_연금저축계좌설정약관.pdf": [
+          11,
+          12
+        ],
+        "07_대고객환매조건부매매약관.pdf": [
+          5,
+          5
+        ],
+        "08_기관간환매조건부매매약관.pdf": [
+          11,
+          11
+        ],
+        "09_기업어음증권거래약관.pdf": [
+          4,
+          4
+        ],
+        "10_전자금융거래 이용에 관한 기본약관.pdf": [
+          7,
+          7
+        ],
+        "11_외국집합투자증권 매매거래에 관한 표준약관.pdf": [
+          6,
+          7
+        ],
+        "12_수익증권저축약관.pdf": [
+          7,
+          8
+        ],
+        "13_해외파생상품시장거래중개계좌설정약관.pdf": [
+          6,
+          6
+        ],
+        "14_해외파생상품시장거래총괄계좌설정약관.pdf": [
+          7,
+          8
+        ],
+        "15_유사해외통화선물(FX Margin Trading) 거래약관.pdf": [
+          6,
+          6
+        ]
+      },
+      "scopes": {
+        "A": [
+          "financial_glossary_readable.pdf",
+          "standard_terms/*.pdf"
+        ],
+        "B": [
+          "*.pdf",
+          "*/*.pdf"
+        ]
+      },
+      "titles": {
+        "financial_glossary_readable.pdf": "금융용어 모음",
+        "financial_life_guide.pdf": "20대를 위한 금융생활 가이드북",
+        "housing_pension_2026.pdf": "2026 주택연금 백문백답",
+        "housing_policy_finance_2025.pdf": "우리나라 주택 정책금융 현황과 평가",
+        "insurance_terms_example_2020.pdf": "보험약관 이해 가이드북",
+        "policy_finance_debt_adjustment_2026.pdf": "정책서민금융 및 채무조정제도 분석",
+        "retirement_pension_2025.pdf": "퇴직연금 보도자료 2025",
+        "self_employed_debt_2025.pdf": "최근 자영업자의 채무상환능력 평가 및 시사점"
+      },
+      "set_scope": {
+        "base_positive": "A",
+        "base_negative": "A",
+        "life_guide": "B",
+        "additional": "B",
+        "self": "B"
+      }
+    },
+    "chunking": {
+      "method": "structure",
+      "chunk_size": 950,
+      "chunk_overlap": 119,
+      "add_header": false,
+      "max_chars": 1600
+    },
+    "embedding": {
+      "model": "gemini-embedding-2",
+      "dimensions": 3072,
+      "task_type": null,
+      "text_format": "gemini2_qa"
+    },
+    "retrieval": {
+      "method": "hybrid",
+      "k": 5,
+      "mmr": false,
+      "mmr_lambda": 0.5,
+      "hybrid_alpha": 0.5,
+      "bm25_tokenizer": "kiwi",
+      "rerank_pool": 15
+    },
+    "answer": {
+      "model": "gemini-3.5-flash-lite",
+      "prompt": "prompts/answer_v4.md",
+      "temperature": 0,
+      "thinking_level": "low"
+    },
+    "agent": {
+      "max_research": 2,
+      "max_cite_retry": 1,
+      "node_models": {
+        "classify": null,
+        "grade": null,
+        "rewrite": null
+      }
+    },
+    "judge": {
+      "model": "gemini-3.6-flash",
+      "prompt": "prompts/judge_v1.md",
+      "temperature": 0,
+      "thinking_level": "low"
+    },
+    "run": {
+      "concurrency": 4,
+      "timeout_s": 120,
+      "max_retries": 2
+    },
+    "environment": {
+      "python": "3.13.13",
+      "git": {
+        "commit": "bf2bb65",
+        "branch": "henry-golden-self-v2",
+        "dirty": true
+      },
+      "packages": {
+        "pymupdf": "1.28.2",
+        "google-genai": "2.23.0",
+        "langchain": "1.4.0",
+        "langchain-core": "1.6.6",
+        "langchain-google-genai": "4.4.0",
+        "langchain-text-splitters": "1.1.2",
+        "langgraph": "1.2.11",
+        "pydantic": "2.13.5",
+        "chromadb": "1.5.9",
+        "langchain-chroma": "1.1.0",
+        "rank-bm25": "0.2.2",
+        "kiwipiepy": "0.23.2",
+        "PyYAML": "6.0.3",
+        "python-dotenv": "1.2.3",
+        "pytest": "9.1.1",
+        "streamlit": null
+      }
+    },
+    "retrieval_only": false
+  },
+  "environment": {
+    "python": "3.13.13",
+    "git": {
+      "commit": "bf2bb65",
+      "branch": "henry-golden-self-v2",
+      "dirty": true
+    },
+    "packages": {
+      "pymupdf": "1.28.2",
+      "google-genai": "2.23.0",
+      "langchain": "1.4.0",
+      "langchain-core": "1.6.6",
+      "langchain-google-genai": "4.4.0",
+      "langchain-text-splitters": "1.1.2",
+      "langgraph": "1.2.11",
+      "pydantic": "2.13.5",
+      "chromadb": "1.5.9",
+      "langchain-chroma": "1.1.0",
+      "rank-bm25": "0.2.2",
+      "kiwipiepy": "0.23.2",
+      "PyYAML": "6.0.3",
+      "python-dotenv": "1.2.3",
+      "pytest": "9.1.1",
+      "streamlit": null
+    }
+  },
+  "scores": {
+    "correctness_mean": 0.9107,
+    "fully_correct": 0.8571,
+    "status_ok": 0.8571,
+    "citation_in_context": 1.0,
+    "citation_on_target": 1.0
+  },
+  "by_set": {
+    "self3": {
+      "n": 28,
+      "correctness_mean": 0.9107,
+      "fully_correct": 0.8571,
+      "status_ok": 0.8571,
+      "page_hit@5": 1.0
+    }
+  },
+  "retrieval": {
+    "page_hit@5": 1.0,
+    "mrr": 0.9722,
+    "evid@5": 1.0,
+    "gold@5": 2.4444,
+    "page_hit": 1.0,
+    "evid": 1.0,
+    "chars": 3222.8333
+  },
+  "cost": {
+    "usd": 0.110306,
+    "usd_per_question": 0.003939,
+    "usd_by_model": {
+      "gemini-embedding-2": 0.000337,
+      "gemini-3.5-flash-lite": 0.109969
+    },
+    "judge_usd": 0.036208,
+    "index_build_usd": 0.108336,
+    "input_tokens": 317072,
+    "output_tokens": 6141,
+    "thinking_tokens": 0,
+    "tokens_per_question": 11543.3
+  },
+  "calls": {
+    "llm": 56,
+    "llm_per_question": 2.0,
+    "searches_per_question": 1.0,
+    "judge": 28
+  },
+  "latency_s": {
+    "p50": 2.64,
+    "p90": 16.927
+  },
+  "created_at": "2026-10-22T11:11:56"
+}
