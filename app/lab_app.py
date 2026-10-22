@@ -51,16 +51,23 @@ nav = st.navigation({
 })
 
 import importlib  # noqa: E402
+import sys  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 import lab.common  # noqa: E402
 
-# Streamlit reruns page files but keeps imported modules: reload the shared module when its file changed,
-# so an edit (or a git pull) never leaves pages calling an old version.
-_mtime = Path(lab.common.__file__).stat().st_mtime
-if getattr(lab.common, "_loaded_mtime", None) != _mtime:
-    importlib.reload(lab.common)
-    lab.common._loaded_mtime = _mtime
+# Streamlit reruns page files but keeps imported modules: reload every helper module of app/lab whose file
+# changed (lab.common first, the others import from it), so an edit or a git pull never leaves a page calling
+# an old version (e.g. report.py calling report_build.build() with its new arguments).
+for _name in ["lab.common"] + sorted(n for n in list(sys.modules) if n.startswith("lab.") and n != "lab.common"):
+    _mod = sys.modules.get(_name)
+    _file = getattr(_mod, "__file__", None)
+    if not _file:
+        continue
+    _mtime = Path(_file).stat().st_mtime
+    if getattr(_mod, "_loaded_mtime", None) != _mtime:
+        importlib.reload(_mod)
+        _mod._loaded_mtime = _mtime
 
 from lab.common import branch_agents, picked, picked_runs  # noqa: E402
 
