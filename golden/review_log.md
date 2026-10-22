@@ -80,7 +80,7 @@ python -m pytest tests/test_provided_golden.py
 
 `self.jsonl`(초안 20문항)은 다른 브랜치의 최종 test 실행에 쓰여 고정됐다(CLAUDE.md: 쓴 골든셋은 고치지 않고 새 버전). 그래서 고친 내용은 `self_v2.jsonl`에 새 qid(`SELF201`~`SELF228`)로 만들었다. 초안의 qid를 다시 쓰면 그 실행 결과와 조용히 어긋난다. 초안과 이어 보려면 각 문항의 `v1_qid`를 본다(SELF2NN ← SELF0NN).
 
-- 구성: 28문항 = 답변 가능 18 + 답변 불가 10. 세트 `self3`(초안 `self`와 섞이지 않게 새로 붙였다), 분할 전부 `test`. **어떤 시스템에도 돌리지 않았고 `src/rag/golden.py`의 `GOLDEN_FILES`에도 등록하지 않았다.** 등록하려면 `GOLDEN_FILES`, `SETS`, `EXTRA_SCOPE`(`self3`: B) 세 곳을 고쳐야 하고, `docs/RESUME.md`가 test 분할을 다시 돌리지 말라고 하므로 평가 없이 골든셋 기록으로만 둔다.
+- 구성: 28문항 = 답변 가능 18 + 답변 불가 10. 세트 `self3`(초안 `self`와 섞이지 않게 새로 붙였다), 분할 전부 `test`. `src/rag/golden.py`의 `GOLDEN_FILES`, `SETS`, `EXTRA_SCOPE`(`self3`: B)에 등록했고(이 브랜치에서만), 최종 시스템 T4로 **한 번** 평가했다(카드 015, `results/test_013b_rerank_lite_self3`, 재검증용; 28문항 중 20문항은 T4가 이미 푼 문항이다). 이 브랜치는 `main`에 병합하지 않는다: `main`의 EVALUATION.md·PROCESS 10절·RETROSPECTIVE.md가 "test를 두 번 봤다"고 적고 있어 세 번째 사용이 서술과 어긋나고, 마감 직전의 최종본을 건드리지 않으려는 결정이다(2026-10-22, 사용자).
 - 초안에서 가져온 20문항(SELF201–220): 내용은 그대로다. 바꾼 것은 둘뿐이다.
   1. **SELF219 (TDF 추천 거절)**: `must_include`에서 '과거 수익률'과 '원금 손실 가능'을 뺐다. 후자는 자료에 없는 일반 상식이라 필수 항목으로 두면 근거 없는 감점이 된다. `must_include`는 '특정 펀드 추천·예측 불가' 하나다.
   2. **정답 페이지 추가 4건**(README 검수 체크리스트 "같은 내용이 다른 쪽에도 있으면 모두 정답으로"): 초안은 한 쪽만 적었는데 같은 수치가 다른 쪽에도 있었다. 그대로 두면 올바른 검색도 page_hit에서 놓친 것으로 센다.
