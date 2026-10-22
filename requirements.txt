@@ -23,3 +23,6 @@ kiwipiepy==0.23.2
 PyYAML==6.0.3
 python-dotenv==1.2.3
 pytest==9.1.1
+
+# Visualization (optional, app/streamlit_app.py; added 2026-10-22)
+streamlit==1.66.1
