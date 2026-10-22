@@ -6,6 +6,8 @@
 - Final test 131 q: T1 0.718, T2 0.889, T3 0.916, T4 0.855 (EVALUATION.md).
 - After the final test: card 014 agent v2 (memo + answer check + 1 revision) = 0.928 on dev, same as T2 -> not adopted. T3 ran on dev for the first time: 0.939.
 - Done: EVALUATION, PROCESS (1.1 filled, 8, 10, 11, ledger 7,775 calls), AGENT_GRAPH section 7, RETROSPECTIVE.md, fresh-venv `pip install -r requirements.txt` + 42 tests pass (Python 3.13.16).
+- Streamlit: "직접 검색해서 써보기" (live node path, default = T4), plain-language pages, "배운 점". `submission/시각화 자료.pdf` is built around T4; T3 is the comparison, v2 only under "tried, no effect". AGENT_GRAPH.md says up front that T4 is not an agent.
+- PRs #1 and #2 merged into `main`; later commits go in a new PR.
 
 ## Next (3)
 1. Owner reviews and merges the PR.

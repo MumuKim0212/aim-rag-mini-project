@@ -8,6 +8,8 @@ GUIDE: 제출물 "Agent 그래프 구조도". 각 노드의 역할, 노드 간 �
 
 # Agent 그래프 구조도
 
+> **이 문서는 비교용 Agent(T3)의 구조도다. 최종 시스템은 T4로, Agent가 아닌 3칸 RAG(후보 15개 → LLM rerank 5개 → 답변, `gemini-3.5-flash-lite`)다** ([EVALUATION.md](EVALUATION.md) 1절, 그림은 [시각화 자료.pdf](시각화%20자료.pdf)). T3는 과제의 "기본 RAG 대 Agent" 비교를 위해 T2에 판단 노드를 더한 것이고, 7절의 v2는 채택하지 않은 시도다.
+
 상태: 구현 완료 (2026-10-21, `src/rag/agent.py`, LangGraph). 2026-10-22: 검색 노드가 T2와 같은 rerank를 거치고 답변 프롬프트는 설정을 따른다(최종 T3는 `answer_v4`). 최종 체인 위의 T3 수치는 6절 끝(dev는 카드 014에서 처음 실행). 초안과 달라진 점은 6절, 시도했지만 채택하지 않은 v2는 7절
 
 ## 1. 설계 의도

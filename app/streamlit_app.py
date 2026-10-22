@@ -278,12 +278,12 @@ def page_flow():
             st.write(body)
             st.caption(f"실제로 쓴 기술: {tech}")
     st.divider()
-    st.subheader("비교용: 스스로 점검하는 Agent 구조")
-    st.write("같은 찾기·답하기에 **‘판단하는 칸’**을 더한 버전입니다. 질문 종류를 먼저 보고, 찾은 근거가 부족하면 검색어를 바꿔 다시 찾습니다. "
-             "점선 칸 ‘답 검사’는 나중에 더해 본 개선판(v2)에만 있습니다.")
+    st.subheader("비교용: Agent 구조 (T3, 최종 시스템 아님)")
+    st.write("과제의 ‘기본 RAG 대 Agent’ 비교를 위해, 위의 찾기·답하기에 **‘판단하는 칸’**을 더한 버전입니다. "
+             "질문 종류를 먼저 보고, 찾은 근거가 부족하면 검색어를 바꿔 다시 찾습니다. **최종 시스템(T4)은 위의 3칸뿐입니다.**")
     left, right = st.columns([3, 2])
     with left:
-        st.graphviz_chart(flow_chart(AGENT_NODES + V2_NODES, AGENT_EDGES + V2_EDGES), width="stretch")
+        st.graphviz_chart(flow_chart(AGENT_NODES, AGENT_EDGES), width="stretch")
     with right:
         st.markdown("""
 **칸(노드)마다 하는 일**
@@ -292,12 +292,11 @@ def page_flow():
 - **답할 수 있나?**: 찾은 조각만으로 답이 되는지 AI가 판단합니다.
 - **다시 찾기**: 부족하면 무엇이 부족한지 보고 검색어를 새로 씁니다. 최대 2번(총 3번 찾기).
 - **답 쓰기 / 출처 확인**: 답을 쓰고, 출처 번호가 실제로 찾은 조각을 가리키는지 코드로 확인합니다.
-- **답 검사 (v2)**: 다른 AI가 초안에서 빠진 내용을 찾고, 있으면 1번 고쳐 쓰게 합니다.
 
-**끝나는 조건**: 다시 찾기 최대 2번, 출처 다시 쓰기 최대 1번, 고쳐 쓰기 최대 1번. 그래서 끝없이 돌지 않습니다.
+**끝나는 조건**: 다시 찾기 최대 2번(총 3번 찾기), 출처 다시 쓰기 최대 1번. 그래서 끝없이 돌지 않습니다.
 """)
-    st.markdown('<div class="note"><b>결과</b> Agent(T3)는 개선판보다 조금 나았지만(시험 0.916 대 0.889) 운의 범위 안이었고 비용은 1.5배였습니다. '
-                '답 검사를 더한 v2는 연습 문제에서 개선판과 점수가 같았습니다(0.928). 검사 칸이 90개 중 3개만 지적했기 때문입니다.</div>',
+    st.markdown('<div class="note"><b>결과</b> Agent(T3)는 개선판(T2)보다 조금 나았지만(시험 0.916 대 0.889) 운의 범위 안이었고 비용은 1.5배였습니다. '
+                '그래서 최종으로는 쓰지 않았습니다. 시험 뒤에 ‘답 검사’ 칸을 더한 Agent v2도 해 봤지만 효과가 없어 버렸습니다(‘💡 배운 점’).</div>',
                 unsafe_allow_html=True)
 
 
@@ -306,10 +305,10 @@ TYPE_TEXT = {"document": "문서를 찾아 답할 수 있는 질문", "needs_inf
              "inappropriate": "해서는 안 되는 요청 (상품 추천, 수익 예측 등)", "injection": "규칙을 어기라는 지시가 섞인 질문"}
 
 EXAMPLES = [("POS001", "보통 질문"), ("NEG037", "다시 찾기가 일어나는 질문"), ("NEG013", "정보를 더 물어봐야 하는 질문"),
-            ("NEG004", "거절해야 하는 질문"), ("POS045", "v2에서 답 검사 후 고쳐 쓴 질문")]
+            ("NEG004", "거절해야 하는 질문"), ("POS045", "(버린 시도 v2용) 답 검사 후 고쳐 쓴 질문")]
 
-SYSTEMS = {"★ 최종 시스템 (작은 AI, 칸 3개)": ("rag", CFG_LITE), "개선판 (큰 AI, 칸 3개)": ("rag", CFG_FLASH),
-           "Agent (스스로 점검, 큰 AI)": ("agent", CFG_AGENT), "Agent v2 (+ 답 검사 칸)": ("agent", CFG_AGENT_V2)}
+SYSTEMS = {"★ T4 최종 시스템 (작은 AI, 칸 3개)": ("rag", CFG_LITE), "T2 개선판 (큰 AI, 칸 3개) · 비교용": ("rag", CFG_FLASH),
+           "T3 Agent (스스로 점검, 큰 AI) · 비교용": ("agent", CFG_AGENT), "Agent v2 (+ 답 검사 칸) · 버린 시도": ("agent", CFG_AGENT_V2)}
 
 
 def show_chunks(units, picked_ids=None, limit=None):
@@ -464,7 +463,8 @@ def run_rag_live(cfg_path: str, question: str, scope: str, graph_slot, log):
 def page_live():
     st.title("💬 직접 검색해서 써보기")
     st.write("궁금한 금융 질문을 넣어 보세요. 시스템이 **어떤 칸을 어떤 순서로 지나가는지** 왼쪽 그림에 실시간으로 표시되고, "
-             "오른쪽에는 칸마다 무엇을 판단했는지가 쉬운 말로 쌓입니다.")
+             "오른쪽에는 칸마다 무엇을 판단했는지가 쉬운 말로 쌓입니다. 기본은 **최종 시스템(T4)**이고, "
+             "Agent(T3)를 고르면 ‘근거가 부족하면 다시 찾기’ 같은 갈림길도 볼 수 있습니다.")
     st.caption("실제로 AI를 부릅니다. 질문 하나에 약 0.004~0.02달러(5~25원) 듭니다. 시험 문제는 쓰지 않습니다. 같은 질문도 매번 조금씩 다르게 흘러갈 수 있습니다.")
     dev = {i["qid"]: i for i in load_golden(split="dev")}
     ex = {f"{label} · {dev[q]['question'][:40]}…": q for q, label in EXAMPLES if q in dev}
@@ -472,7 +472,8 @@ def page_live():
     with c1:
         pick = st.selectbox("예시 질문 (직접 써도 됩니다)", ["(직접 입력)"] + list(ex))
     with c2:
-        mode = st.radio("어떤 도우미로 답할까요?", list(SYSTEMS), index=2)
+        mode = st.radio("어떤 도우미로 답할까요?", list(SYSTEMS), index=0,
+                        help="제출하는 시스템은 T4입니다. 나머지는 비교해 보라고 넣어 둔 것입니다. 칸이 많은 Agent를 고르면 갈림길과 되돌아가는 길이 보입니다.")
     item = dev[ex[pick]] if pick in ex else None
     question = st.text_area("질문", value=item["question"] if item else "", height=90,
                             placeholder="예: 휴면성 증권계좌는 어떤 계좌인가요?  /  주택연금은 몇 살부터 가입할 수 있나요?")
@@ -557,10 +558,10 @@ def page_history():
     for col, (n, e) in zip(cols, lite):
         col.metric(n, f"{score(e):.3f}" if score(e) else "-")
     st.caption("큰 AI + 다시 고르기는 0.928, 작은 AI + 다시 고르기는 0.894입니다. 답변 비용은 작은 AI가 약 40%입니다(질문당 0.0035달러 대 0.0086달러).")
-    st.subheader("구조를 바꿔 본 시도: Agent")
-    agent = [("개선판 (칸 3개)", "dev_013_rerank_flash36_fix", "비교 기준"),
-             ("Agent (스스로 점검)", "dev_008b_agent950", "질문 종류 판단·근거 판단·다시 찾기"),
-             ("Agent v2 (+ 답 검사)", "dev_014_agent_v2", "답을 검사해 1번 고쳐 쓰기")]
+    st.subheader("구조를 바꿔 본 시도: Agent (최종에 쓰지 않음)")
+    agent = [("T2 개선판 (칸 3개)", "dev_013_rerank_flash36_fix", "비교 기준. T4와 같은 구조에 큰 AI"),
+             ("T3 Agent (스스로 점검)", "dev_008b_agent950", "질문 종류 판단·근거 판단·다시 찾기"),
+             ("Agent v2 (+ 답 검사) · 버린 시도", "dev_014_agent_v2", "답을 검사해 1번 고쳐 쓰기")]
     cols = st.columns(3)
     for col, (n, e, what) in zip(cols, agent):
         s = summary_of(e)
