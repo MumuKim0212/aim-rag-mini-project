@@ -78,9 +78,13 @@ def load_agent(mode: str = "repair"):
 
 
 def korean_mermaid(agent, path: list[str] | None = None) -> str:
-    """LangGraph가 그린 mermaid의 노드·분기 이름을 한글로 바꾼다. path를 주면 지나간 노드를 색칠한다.
+    """LangGraph가 그린 mermaid의 노드·분기 이름을 한글로 바꾼다. path를 주면 지나간 노드를 색칠한다."""
+    return translate(agent.graph.get_graph().draw_mermaid(), path)
+
+
+def translate(text: str, path: list[str] | None = None) -> str:
+    """draw_mermaid() 결과를 한글로 바꾼다 (다른 브랜치 agent의 그래프 텍스트에도 쓴다).
     mermaid.ink 렌더러는 따옴표 안의 <br> 뒤 괄호를 거부하므로 이름에 괄호를 쓰지 않는다."""
-    text = agent.graph.get_graph().draw_mermaid()
     text = re.sub(r"^---.*?---\n", "", text, flags=re.S)  # 머리말(config) 제거
     lines = []
     for line in text.splitlines():

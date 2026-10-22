@@ -33,7 +33,8 @@ HOME = ROOT / "out" / "agent_runs"
 WORKTREES, RESULTS, JOBS = HOME / "worktrees", HOME / "results", HOME / "jobs"
 LOG = HOME / "log.jsonl"
 CACHE = HOME / "branch_agents.json"
-PYTHON = sys.executable
+PYTHON = str(Path(sys.executable).with_name("python.exe"))  # also when this runs under pythonw.exe
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 STUB = 'raise NotImplementedError("card 008")'
 
 
@@ -95,7 +96,7 @@ def scan(fetch: bool = True) -> list[dict]:
     cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
     found, blobs = [], None
     for branch, sha in branches(fetch):
-        if sha not in cache:
+        if sha not in cache or any("added" not in e for e in cache[sha]["agents"]):
             blobs = blobs or Blobs()
             files = [f.split("/")[-1] for f in git("ls-tree", "--name-only", sha, "configs/").split()
                      if f.endswith(".yaml")]
@@ -111,7 +112,8 @@ def scan(fetch: bool = True) -> list[dict]:
                 if (system == "agent" and (not agent_py or STUB in agent_py)) or (system == "agent_repair" and not has_repair):
                     continue
                 ident = hashlib.sha1(json.dumps([code, cfg], sort_keys=True, default=str).encode()).hexdigest()[:8]
-                entries.append({"config": f, "name": cfg.get("name"), "system": system,
+                added = int(git("log", "-1", "--format=%ct", sha, "--", f"configs/{f}").strip() or 0)
+                entries.append({"config": f, "name": cfg.get("name"), "system": system, "added": added,
                                 "description": cfg.get("description", ""), "answer_model": cfg.get("answer", {}).get("model"),
                                 "chunking": cfg.get("chunking", {}), "card": cfg.get("card"), "same_code_id": ident,
                                 "judge": cfg.get("judge", {})})
@@ -131,19 +133,97 @@ def label(branch: str, config: str, agents: list[dict]) -> str:
     return f"{branch} agent" + (f" ({config.removesuffix('.yaml')})" if len(agents) > 1 else "")
 
 
+def latest_per_branch(agents: list[dict]) -> list[dict]:
+    """One agent per branch: the one whose config was committed last on that branch (ties: higher config
+    number), labelled '<branch> agent'."""
+    best: dict[str, dict] = {}
+    for a in agents:
+        b = best.get(a["branch"])
+        if b is None or (a["added"], a["config"]) > (b["added"], b["config"]):
+            best[a["branch"]] = a
+    return [{**a, "label": f"{a['branch']} agent",
+             "added_at": datetime.fromtimestamp(a["added"]).strftime("%Y-%m-%d %H:%M")}
+            for a in sorted(best.values(), key=lambda a: a["added"], reverse=True)]
+
+
 # ---------------------------------------------------------------- run
+
+MAX_PARALLEL = 3          # agent runs at once (each answers 4 questions at a time); the rest wait as "queued"
+LOCKS = HOME / "locks"
+
+
+class Lock:
+    """An OS file lock (msvcrt): released by Windows when the holding process ends, even if it crashes."""
+
+    def __init__(self, name: str):
+        LOCKS.mkdir(parents=True, exist_ok=True)
+        self.f = open(LOCKS / f"{name}.lock", "a+")
+
+    def acquire(self, wait: bool = True) -> bool:
+        import msvcrt
+        while True:
+            try:
+                self.f.seek(0)
+                msvcrt.locking(self.f.fileno(), msvcrt.LK_NBLCK, 1)
+                return True
+            except OSError:
+                if not wait:
+                    return False
+                time.sleep(2)
+
+    def release(self):
+        import msvcrt
+        self.f.seek(0)
+        msvcrt.locking(self.f.fileno(), msvcrt.LK_UNLCK, 1)
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self.release()
+
+
+def _slot() -> Lock:
+    """Wait for one of MAX_PARALLEL run slots."""
+    locks = [Lock(f"slot{i}") for i in range(MAX_PARALLEL)]
+    while True:
+        for lk in locks:
+            if lk.acquire(wait=False):
+                return lk
+        time.sleep(3)
+
+
+def _alive(pid: int | None) -> bool:
+    if not pid:
+        return False
+    import ctypes
+    k = ctypes.windll.kernel32
+    h = k.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return False
+    code = ctypes.c_ulong()
+    k.GetExitCodeProcess(h, ctypes.byref(code))
+    k.CloseHandle(h)
+    return code.value == 259  # STILL_ACTIVE
+
 
 def _worktree(sha: str) -> Path:
     path = WORKTREES / sha[:10]
-    if not (path / "scripts" / "run.py").exists():
-        WORKTREES.mkdir(parents=True, exist_ok=True)
-        git("worktree", "add", "--detach", str(path), sha)
-    index = path / "out" / "index"
-    if not index.exists():
-        (path / "out").mkdir(exist_ok=True)
-        (ROOT / "out" / "index").mkdir(parents=True, exist_ok=True)
-        import _winapi  # a directory junction needs no admin rights on Windows
-        _winapi.CreateJunction(str(ROOT / "out" / "index"), str(index))
+    with Lock("worktree"):  # two runs of the same commit must not both create its checkout
+        if not (path / "scripts" / "run.py").exists():
+            WORKTREES.mkdir(parents=True, exist_ok=True)
+            if path.exists():  # a half-made checkout from an interrupted run
+                git("worktree", "remove", "--force", str(path), check=False)
+                shutil.rmtree(path, ignore_errors=True)
+                git("worktree", "prune")
+            git("worktree", "add", "--detach", str(path), sha)
+        index = path / "out" / "index"
+        if not index.exists():
+            (path / "out").mkdir(exist_ok=True)
+            (ROOT / "out" / "index").mkdir(parents=True, exist_ok=True)
+            import _winapi  # a directory junction needs no admin rights on Windows
+            _winapi.CreateJunction(str(ROOT / "out" / "index"), str(index))
     return path
 
 
@@ -171,8 +251,10 @@ def _job(exp: str, **update) -> dict:
 
 def run(entry: dict, limit: int | None, sets: str | None, exp: str) -> dict:
     """Build index (if missing), run, grade, evaluate on the branch's own code; returns the log row."""
+    _job(exp, status="queued", step="queued", entry=entry, limit=limit, sets=sets, pid=os.getpid())
+    slot = _slot()  # noqa: F841  held until this process ends (Windows releases the lock with the process)
     started = time.time()
-    _job(exp, status="running", step="checkout", entry=entry, limit=limit, sets=sets, started=datetime.now().isoformat(timespec="seconds"))
+    _job(exp, status="running", step="checkout", started=datetime.now().isoformat(timespec="seconds"))
     log_path = JOBS / f"{exp}.log"
     wt = _worktree(entry["sha"])
     _job(exp, worktree=str(wt))
@@ -187,7 +269,15 @@ def run(entry: dict, limit: int | None, sets: str | None, exp: str) -> dict:
             _job(exp, step=step)
             log.write(f"\n=== {step}: {' '.join(args)}\n")
             log.flush()
-            r = subprocess.run([PYTHON, "-X", "utf8", *args], cwd=wt, env=_env(), stdout=log, stderr=subprocess.STDOUT)
+            index_lock = Lock("index") if step == "index" else None  # the index folder is shared by every checkout
+            if index_lock:
+                index_lock.acquire()
+            try:
+                r = subprocess.run([PYTHON, "-X", "utf8", *args], cwd=wt, env=_env(), stdout=log, stderr=subprocess.STDOUT,
+                                   creationflags=NO_WINDOW)
+            finally:
+                if index_lock:
+                    index_lock.release()
             if r.returncode:
                 row = {"experiment": exp, "status": "failed", "failed_step": step, **_meta(entry, limit, sets, started)}
                 _append(row)
@@ -204,7 +294,8 @@ def run(entry: dict, limit: int | None, sets: str | None, exp: str) -> dict:
 
 
 def _meta(entry: dict, limit, sets, started: float) -> dict:
-    return {"agent": entry["label"], "branch": entry["branch"], "commit": entry["commit"], "config": entry["config"],
+    return {"agent": entry["label"], "branch": entry["branch"], "commit": entry["commit"], "sha": entry["sha"],
+            "config": entry["config"],
             "system": entry["system"], "answer_model": entry.get("answer_model"), "same_code_id": entry.get("same_code_id"),
             "limit": limit, "sets": sets, "started": datetime.fromtimestamp(started).isoformat(timespec="seconds"),
             "minutes": round((time.time() - started) / 60, 1)}
@@ -239,8 +330,16 @@ def jobs() -> list[dict]:
         return []
     out = []
     for p in sorted(JOBS.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        if p.name.endswith(".entry.json"):
+            continue
         job = json.loads(p.read_text(encoding="utf-8"))
         job["experiment"] = p.stem
+        if job.get("status") in ("running", "queued"):
+            # no live process behind it (older jobs kept no pid: no update for 15 minutes) -> it was stopped
+            dead = not _alive(job["pid"]) if job.get("pid") else time.time() - p.stat().st_mtime > 900
+            if dead:
+                job = _job(p.stem, status="stopped")
+                job["experiment"] = p.stem
         if job.get("status") == "running" and job.get("worktree"):
             job["done_questions"] = _done(Path(job["worktree"]), p.stem)
         out.append(job)
@@ -260,18 +359,74 @@ def _done(wt: Path, exp: str) -> int:
             return 0
 
 
+def sha_of(row: dict) -> str:
+    """Full commit of a log row (older rows kept only the short hash)."""
+    return row.get("sha") or git("rev-parse", row["commit"]).strip()
+
+
+_CODE = """
+import json, sys
+sys.path[:0] = ["src", "."]
+from rag.env import setup
+setup()
+from rag.config import load_config
+from rag.systems import build_system
+agent = build_system(load_config("configs/{config}"))
+{body}
+"""
+
+
+def in_checkout(sha: str, config: str, body: str, timeout: int = 300) -> dict:
+    """Run `body` with `agent` built from that commit's own code and config; body prints one JSON object."""
+    wt = _worktree(sha)
+    r = subprocess.run([PYTHON, "-X", "utf8", "-c", _CODE.format(config=config, body=body)], cwd=wt, env=_env(),
+                       capture_output=True, text=True, encoding="utf-8", timeout=timeout)
+    lines = [line for line in r.stdout.splitlines() if line.startswith("{")]
+    if r.returncode or not lines:
+        raise RuntimeError((r.stderr or r.stdout).strip()[-800:])
+    return json.loads(lines[-1])
+
+
+def graph_of(sha: str, config: str) -> str:
+    """draw_mermaid() of the agent graph on that commit (no API calls)."""
+    return in_checkout(sha, config, 'print(json.dumps({"mermaid": agent.graph.get_graph().draw_mermaid()}))',
+                       timeout=120)["mermaid"]
+
+
+def live_run(sha: str, config: str, question: str, scope: str) -> dict:
+    """One question through that commit's agent (API calls); returns the system result dict."""
+    body = (f"import time\nstart = time.perf_counter()\nres = agent.run({question!r}, {scope!r})\n"
+            "res['latency_s'] = round(time.perf_counter() - start, 1)\n"
+            "print(json.dumps(res, ensure_ascii=False, default=str))")
+    return in_checkout(sha, config, body)
+
+
 def start(entry: dict, limit: int | None, sets: str | None) -> str:
     """Start `run` in a background process that outlives the caller (the Streamlit page)."""
     exp = experiment_name(entry, limit)
     JOBS.mkdir(parents=True, exist_ok=True)
     (JOBS / f"{exp}.entry.json").write_text(json.dumps(entry, ensure_ascii=False), encoding="utf-8")
-    _job(exp, status="queued", entry=entry, limit=limit, sets=sets)
-    args = [PYTHON, "-X", "utf8", str(Path(__file__)), "run-entry", exp] + (["--limit", str(limit)] if limit else []) \
-        + (["--sets", sets] if sets else [])
-    flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
-    subprocess.Popen(args, cwd=ROOT, creationflags=flags, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     close_fds=True)
+    args = [str(Path(PYTHON).with_name("pythonw.exe")), "-X", "utf8", str(Path(__file__)), "run-entry", exp] \
+        + (["--limit", str(limit)] if limit else []) + (["--sets", sets] if sets else [])
+    _job(exp, status="queued", step="queued", entry=entry, limit=limit, sets=sets)
+    _job(exp, pid=_spawn(args))
     return exp
+
+
+def _spawn(args: list[str]) -> int:
+    """Start a windowless process that is not a child of this one. The Streamlit server (and the Claude/IDE
+    shell) run inside a Windows job object that kills its processes when it closes and may forbid breaking
+    away, so the process is created by WMI (Win32_Process.Create), like one started from the Start menu."""
+    cmd = subprocess.list2cmdline(args).replace("'", "''")
+    ps = (f"$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments "
+          f"@{{CommandLine='{cmd}'; CurrentDirectory='{ROOT}'}}; if ($r.ReturnValue -ne 0) {{ exit 1 }}; $r.ProcessId")
+    r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True, text=True,
+                       creationflags=NO_WINDOW)
+    if r.returncode == 0 and r.stdout.strip().isdigit():
+        return int(r.stdout.strip())
+    p = subprocess.Popen(args, cwd=ROOT, creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
+    return p.pid
 
 
 def main():
@@ -289,7 +444,8 @@ def main():
     e.add_argument("--sets")
     sub.add_parser("log")
     args = p.parse_args()
-    sys.stdout.reconfigure(encoding="utf-8")
+    if sys.stdout:  # None under pythonw.exe (background runs)
+        sys.stdout.reconfigure(encoding="utf-8")
     if args.cmd == "list":
         for a in scan():
             print(f"{a['label']:70} {a['commit']} {a['system']:13} {a['answer_model']} same-code:{a['same_code_id']}")

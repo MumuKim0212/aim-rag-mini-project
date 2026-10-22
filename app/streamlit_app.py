@@ -2,13 +2,13 @@
 
     streamlit run app/streamlit_app.py
 
-Pages: overview, agent select, flow, score history, chunking, a live question run step by step, final test,
-per-question results, log, glossary. The live page calls the Gemini API (needs .env) and uses the indexes in
+Pages: overview, agent select, flow, score history, chunking, a live question run step by step, final test
+(with the branch-agent comparison), per-question results, glossary. The live page calls the Gemini API (needs .env) and uses the indexes in
 out/index (scripts/build_index.py). It runs dev questions or free text, never the test split.
 
-Agent select / log (scripts/branch_agents.py): every app start looks up the agents committed on all origin
-branches; a picked agent runs on dev questions with its own branch's code (a detached checkout under
-out/agent_runs/), and the log page compares two or more such runs.
+Agent select (scripts/branch_agents.py): every app start looks up the newest agent committed on each origin
+branch; checked agents run on the same dev questions with their own branch's code (a detached checkout under
+out/agent_runs/). The final test page compares the finished runs and says in one line which agent leads.
 """
 
 import json
@@ -162,6 +162,14 @@ def page_overview():
                 unsafe_allow_html=True)
     st.write("")
     st.info("왼쪽 메뉴에서 ‘질문 따라가기’를 열면 질문 하나가 위 5단계를 지나는 모습을 직접 볼 수 있습니다.")
+    runs = view_runs()
+    if not runs.empty:
+        st.divider()
+        st.subheader("🤖 실행한 agent 한눈에 비교")
+        st.caption("🤖 에이전트 선택에서 실행한 agent마다 가장 최근 실행입니다. 번호는 사이드바 '볼 agent' 목록과 같습니다.")
+        metrics, grades, common = side_by_side(runs)
+        if metrics and len(metrics) >= 2:
+            st.markdown(f'<div class="hero"><p><b>{verdict(metrics, grades, common)}</b></p></div>', unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------- 1. flow
@@ -207,6 +215,13 @@ digraph A {
 
 def page_flow():
     st.title("🧭 전체 흐름")
+    a = current_agent()
+    if a is not None:
+        st.subheader(f"선택한 agent의 흐름: {a.name}")
+        st.caption(f"브랜치 {a['branch']}(커밋 {a['commit']})의 코드로 LangGraph 그래프를 만들어 그린 그림입니다. 노드 이름만 한글로 바꿨습니다.")
+        show_graph(a, width=520)
+        st.divider()
+        st.subheader("팀 최종 시스템의 전체 흐름")
     st.caption("글자 그대로 따라가면 됩니다. 점선 위쪽은 미리 한 번 해 두는 일, 아래쪽은 질문이 올 때마다 하는 일입니다.")
     st.graphviz_chart(PIPELINE, width="stretch")
     st.subheader("단계별로 자세히")
@@ -266,6 +281,19 @@ def page_history():
     for col, (n, e) in zip(cols, lite):
         col.metric(n, f"{score(e):.3f}" if score(e) else "-")
     st.caption("큰 모델(3.6 flash) + rerank는 0.928, 작은 모델 + rerank는 0.894입니다. 답변 비용은 작은 모델이 약 40% 수준입니다(문항당 0.0035달러 대 0.0086달러).")
+    runs = view_runs()
+    if not runs.empty:
+        st.subheader("실행한 agent의 점수 (dev)")
+        a = current_agent()
+        import altair as alt
+        chart = runs.assign(선택=[a is not None and n == a.name for n in runs["이름"]])
+        st.altair_chart(alt.Chart(chart).mark_bar().encode(
+            x=alt.X("correctness:Q", title="정답 점수", scale=alt.Scale(domain=[0, 1])),
+            y=alt.Y("이름:N", title=None, sort=None),
+            color=alt.condition("datum.선택", alt.value("#f59e0b"), alt.value("#94a3b8")),
+            tooltip=["이름", "correctness", "n", "usd_per_question", "p90"]), width="stretch")
+        st.caption("주황색 = 사이드바에서 고른 agent. 실행마다 문항 수가 다를 수 있으니 정확한 비교는 🏁 최종 시험 결과의 비교표(공통 문항 기준)를 보세요. "
+                   f"위의 단계별 점수는 팀 최종 체인의 dev 90문항 결과입니다.")
     with st.expander("실험 번호와 카드 보기 (자세히 알고 싶을 때)"):
         st.dataframe(df[["단계", "실험", "점수", "변화"]], hide_index=True, width="stretch")
         cards = sorted((ROOT / "experiments").glob("0*.md"))
@@ -281,6 +309,27 @@ def chunk_html(c: dict) -> str:
 
 def page_chunks():
     st.title("✂️ 글을 어떻게 잘랐나")
+    a = current_agent()
+    if a is not None:
+        s = json.loads((Path(a["path"]) / "summary.json").read_text(encoding="utf-8"))
+        ch, rt = s["config"]["chunking"], s["config"]["retrieval"]
+        used = {}
+        for r in jsonl(str(Path(a["path"]) / "runs.jsonl")):
+            for u in r.get("context") or []:
+                used[u["chunk_id"]] = u
+        lens = [len(u["content"]) for u in used.values()]
+        st.subheader(f"선택한 agent의 자르기·검색 설정: {a.name}")
+        c = st.columns(4)
+        c[0].metric("자르는 방식", ch.get("method", "-"))
+        c[1].metric("조각 크기 / 겹침", f"{ch.get('chunk_size')} / {ch.get('chunk_overlap')}")
+        c[2].metric("검색", f"{rt.get('method')} · k={rt.get('k')}", f"rerank 후보 {rt['rerank_pool']}" if rt.get("rerank_pool") else None,
+                    delta_color="off")
+        c[3].metric("답에 쓴 조각", f"{len(used)}개", f"평균 {sum(lens) // max(len(lens), 1)}자" if lens else None, delta_color="off")
+        with st.expander("이 agent가 답에 실제로 쓴 조각 보기"):
+            for u in list(used.values())[:30]:
+                st.markdown(chunk_html(u) + f'<div class="sub">{u["source"]}</div>', unsafe_allow_html=True)
+        st.divider()
+        st.subheader("팀 최종 시스템의 자르기")
     st.write("검색은 ‘조각’ 단위로 합니다. 조각이 너무 크면 엉뚱한 내용이 섞이고, 너무 작으면 설명이 잘려 나갑니다. "
              "그래서 용어집과 약관은 **의미 단위**(용어 하나, 조 하나)로 자르고, 나머지는 **950자**로 잘랐습니다.")
     base = jsonl(str(index_dir(cfg_of(CFG_BASE), "B") / "chunks.jsonl"))
@@ -337,6 +386,11 @@ EXAMPLES = ["POS001", "POS013", "NEG011", "NEG004", "ADD-IN08"]
 
 def page_live():
     st.title("🔎 질문 하나를 따라가기")
+    a = current_agent()
+    if a is not None:
+        follow_agent(a)
+        st.divider()
+        st.subheader("팀 최종 시스템으로 실시간 실행")
     st.caption("실제로 AI를 호출합니다. 질문 하나에 5~15원 정도 듭니다(작은 모델 약 5원). 시험(test)용 질문은 쓰지 않습니다.")
     dev = {i["qid"]: i for i in load_golden(split="dev")}
     ex = {f"{q} · {dev[q]['question'][:46]}": q for q in EXAMPLES if q in dev}
@@ -435,19 +489,27 @@ def page_test():
     • 큰 모델 → 작은 모델(T4): 점수는 0.03 낮지만(오차 범위 안) 비용은 0.4배, 응답은 2배 빠릅니다. 가격 때문에 T4를 최종으로 골랐습니다.<br>
     • T4는 최종 시험을 두 번째로 쓴 것입니다(처음엔 T1~T3만 돌림). 선택 이유는 가격이고 시험 점수가 아닙니다.</div>
     """, unsafe_allow_html=True)
+    st.divider()
+    agent_comparison()
 
 
 # ---------------------------------------------------------------- 6. per-question
 def page_results():
     st.title("🧾 문항별 결과")
-    exps = sorted(p.name for p in RESULTS.iterdir() if (p / "runs.jsonl").exists() and (p / "grades.jsonl").exists())
+    dirs = {p.name: p for p in RESULTS.iterdir() if (p / "runs.jsonl").exists() and (p / "grades.jsonl").exists()}
+    agents = view_runs()
+    for _, o in agents.iterrows():  # runs made on the agent select page, listed first under their numbered names
+        dirs[o["이름"]] = Path(o["path"])
+    exps = agents["이름"].tolist() + sorted(k for k in dirs if k not in set(agents.get("이름", [])))
+    picked_agent = current_agent()
     names = {"test_013b_rerank_lite": "★ 최종 시험 T4 (최종 시스템)", "dev_013b_rerank_lite_fix": "최종 시스템(개발용 90문항)", "dev_013_rerank_flash36_fix": "큰 모델 + rerank(개발용)",
              "test_013_rerank_flash36": "최종 시험 T2", "test_000_baseline": "최종 시험 T1", "test_008b_agent950": "최종 시험 T3",
              "test_013_rerank_flash36_self2": "최종 시험 T2 (직접 만든 41문항)", "test_000_baseline_self2": "최종 시험 T1 (직접 만든 41문항)", "test_008b_agent950_self2": "최종 시험 T3 (직접 만든 41문항)"}
-    exp = st.selectbox("어느 실행을 볼까요?", exps, index=exps.index("test_013b_rerank_lite") if "test_013b_rerank_lite" in exps else 0,
+    default = picked_agent.name if picked_agent is not None else "test_013b_rerank_lite"
+    exp = st.selectbox("어느 실행을 볼까요?", exps, index=exps.index(default) if default in exps else 0,
                        format_func=lambda e: names.get(e, e))
-    runs = {r["qid"]: r for r in jsonl(str(RESULTS / exp / "runs.jsonl"))}
-    grades = {g["qid"]: g for g in jsonl(str(RESULTS / exp / "grades.jsonl"))}
+    runs = {r["qid"]: r for r in jsonl(str(dirs[exp] / "runs.jsonl"))}
+    grades = {g["qid"]: g for g in jsonl(str(dirs[exp] / "grades.jsonl"))}
     gold = {i["qid"]: i for i in load_golden()}
     rows = [{"문항": q, "점수(0~2)": grades[q]["correctness"], "응답": STATUS.get(runs[q]["status"], (runs[q]["status"],))[0],
              "질문": runs[q]["question"][:70]} for q in grades if q in runs]
@@ -474,72 +536,94 @@ def page_results():
         st.write(i.get("target_answer", "-"))
         st.write("반드시 포함:", ", ".join(i.get("must_include") or []) or "-")
         st.write("정답 근거 쪽:", [f"{t['file']} p.{t['page']}" for t in i.get("targets", [])] or "문서에 없는 질문")
-    with st.expander("답변에 넘긴 조각 5개 보기"):
+    with st.expander(f"답변에 넘긴 조각 {len(r['context'])}개 보기"):
         show_chunks(r["context"], {c["chunk_id"] for c in r.get("citations", [])})
+    others = []
+    for _, o in agents.iterrows():
+        orun, ogr, _ = run_rows(o)
+        if qid in orun:
+            others.append({"agent": o["이름"], "점수": ogr.get(qid, {}).get("correctness"),
+                           "응답": STATUS.get(orun[qid]["status"], (orun[qid]["status"],))[0], "답변": orun[qid]["answer"][:300]})
+    if others:
+        st.markdown("**같은 문항, 실행한 agent별 점수와 답**")
+        st.dataframe(pd.DataFrame(others), hide_index=True, width="stretch")
 
 
 # ---------------------------------------------------------------- 7. glossary
-# ---------------------------------------------------------------- agent select / log (branch agents)
+# ---------------------------------------------------------------- agent select + comparison (branch agents)
 sys.path.insert(0, str(ROOT / "scripts"))
+import importlib  # noqa: E402
+
 import branch_agents as BA  # noqa: E402
+
+
+def fresh(module):
+    """Streamlit reruns this script but keeps imported modules: reload one whose file has changed, so an edit
+    (or a git pull) takes effect without restarting the server."""
+    mtime = Path(module.__file__).stat().st_mtime
+    if getattr(module, "_loaded_mtime", None) != mtime:
+        module = importlib.reload(module)
+        module._loaded_mtime = mtime
+    return module
+
+
+BA = fresh(BA)
 
 EST_USD = {"gemini-3.6-flash": 0.011, "gemini-3.8-flash": 0.011, "gemini-3.5-flash-lite": 0.004,
            "gemini-3.1-flash-lite": 0.004}  # agent USD per question on dev (results of cards 008/014), + judge ~0.0015
 
 
-def refresh_agents(force: bool = False):
-    """Look up the agents committed on every origin branch: once per browser session (each app start or new
-    tab) and on demand. Falls back to the last fetched refs when GitHub cannot be reached."""
+def refresh_agents(force: bool = False) -> list[dict]:
+    """The newest agent committed on each origin branch, looked up once per browser session (each app start or
+    new tab) and on demand. Falls back to the last fetched refs when GitHub cannot be reached."""
     if force or "branch_agents" not in st.session_state:
         with st.sidebar, st.spinner("GitHub 브랜치의 agent 조회 중…"):
             try:
-                st.session_state.branch_agents = BA.scan(fetch=True)
-                st.session_state.branch_agents_note = ""
+                found, note = BA.scan(fetch=True), ""
             except Exception as e:
-                st.session_state.branch_agents = BA.scan(fetch=False)
-                st.session_state.branch_agents_note = f"GitHub에 연결하지 못해 마지막으로 받아 둔 브랜치 정보로 보여 줍니다 ({type(e).__name__})."
+                found, note = BA.scan(fetch=False), f"GitHub에 연결하지 못해 마지막으로 받아 둔 브랜치 정보로 보여 줍니다 ({type(e).__name__})."
+            st.session_state.branch_agents = BA.latest_per_branch(found)
+            st.session_state.branch_agents_note = note
             st.session_state.branch_agents_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     return st.session_state.branch_agents
 
 
 def page_agent_select():
     st.title("🤖 에이전트 선택")
-    hero("팀원 agent를 같은 문항으로 돌려 비교합니다",
-         "GitHub 저장소의 모든 브랜치에서 커밋된 agent를 찾아 목록으로 보여 줍니다. 고른 agent로 dev 문항의 답(QA 데이터)을 만들고 "
-         "채점해서 📋 log 페이지에 쌓습니다.")
+    hero("브랜치마다 가장 최근에 올라온 agent를 같은 문항으로 돌려 비교합니다",
+         "앱을 열 때마다 GitHub 저장소의 모든 브랜치를 조회해 목록을 최신으로 바꿉니다. 비교할 agent를 체크하고 실행하면 "
+         "같은 dev 문항으로 답(QA 데이터)을 만들고 채점해서, 🏁 최종 시험 결과 페이지 아래쪽에 비교와 한 줄 요약이 나옵니다.")
     c1, c2 = st.columns([4, 1])
     if c2.button("🔄 목록 새로고침", width="stretch"):
         refresh_agents(force=True)
     agents = refresh_agents()
-    c1.caption(f"마지막 조회: {st.session_state.get('branch_agents_at')} · 브랜치 "
-               f"{len({a['branch'] for a in agents})}개에서 agent {len(agents)}개")
+    c1.caption(f"마지막 조회: {st.session_state.get('branch_agents_at')} · 브랜치 {len(agents)}개, 브랜치마다 가장 최근 agent 1개")
     if st.session_state.get("branch_agents_note"):
         st.warning(st.session_state.branch_agents_note)
 
+    same = pd.Series([a["same_code_id"] for a in agents]).value_counts()
     table = pd.DataFrame([{
-        "agent": a["label"], "브랜치": a["branch"], "커밋": a["commit"], "커밋 시각": a["date"], "작성자": a["author"],
-        "설정": a["config"], "종류": a["system"], "답변 모델": a["answer_model"],
-        "청킹": f"{a['chunking'].get('method')} {a['chunking'].get('chunk_size')}/{a['chunking'].get('chunk_overlap')}",
-        "같은 코드 묶음": a["same_code_id"], "설명": a["description"],
+        "선택": False, "agent": a["label"], "설정": a["config"].removesuffix(".yaml"), "올라온 시각": a["added_at"],
+        "커밋": a["commit"], "작성자": a["author"], "종류": a["system"], "답변 모델": a["answer_model"],
+        "같은 코드": f"{a['same_code_id']} ({same[a['same_code_id']]}개 같음)" if same[a["same_code_id"]] > 1 else a["same_code_id"],
+        "설명": a["description"],
     } for a in agents])
-    groups = table.groupby("같은 코드 묶음")["agent"].transform("count")
-    table["같은 코드 묶음"] = [f"{g} ({n}개 같음)" if n > 1 else g for g, n in zip(table["같은 코드 묶음"], groups)]
-    st.dataframe(table, width="stretch", hide_index=True, height=320)
-    st.caption("'같은 코드 묶음'이 같은 agent는 코드와 설정이 완전히 같습니다(다른 브랜치에 같은 커밋이 들어간 경우). "
-               "비교할 때는 묶음마다 하나씩만 고르면 됩니다.")
+    edited = st.data_editor(table, hide_index=True, width="stretch", key="agent_pick",
+                            disabled=[c for c in table.columns if c != "선택"],
+                            column_config={"선택": st.column_config.CheckboxColumn("선택", help="실행할 agent를 체크하세요 (여러 개 가능)")})
+    st.caption("'올라온 시각'은 그 agent 설정이 브랜치에 마지막으로 커밋된 시각입니다. '같은 코드'가 같은 agent는 코드와 설정이 완전히 같아 "
+               "점수 차이가 나도 잡음입니다.")
 
-    st.subheader("QA 데이터 만들기")
-    picked = st.multiselect("실행할 agent (여러 개 고르면 같은 문항으로 각각 실행)", [a["label"] for a in agents])
+    chosen = [a for a, pick in zip(agents, edited["선택"]) if pick]
     c1, c2 = st.columns(2)
     limit = c1.select_slider("dev 문항 수 (앞에서부터, 모든 agent가 같은 문항)", [5, 10, 20, 30, 45, 90], value=10)
     sets = c2.multiselect("세트만 고르기 (비우면 전체)", ["base_positive", "base_negative", "life_guide", "additional"])
-    chosen = [a for a in agents if a["label"] in picked]
     est = sum((EST_USD.get(a["answer_model"], 0.011) + 0.0015) * limit for a in chosen)
-    st.markdown(f'<div class="note">예상 비용 약 <b>{est:.2f} USD</b> (agent {len(chosen)}개 × {limit}문항, 채점 포함) · '
-                f'agent 하나에 {limit}문항이면 약 {max(1, limit // 8)}~{max(2, limit // 4)}분. test 문항은 쓰지 않습니다. '
-                "검색 인덱스가 이 PC에 없는 설정이면 처음 한 번 인덱스를 만듭니다(약 0.15 USD).</div>",
+    st.markdown(f'<div class="note">선택 <b>{len(chosen)}개</b> · 예상 비용 약 <b>{est:.2f} USD</b> (채점 포함) · '
+                f'agent 하나에 {limit}문항이면 약 {max(1, limit // 8)}~{max(2, limit // 4)}분, 여러 개는 동시에 실행됩니다. '
+                "test 문항은 쓰지 않습니다. 검색 인덱스가 이 PC에 없는 설정이면 처음 한 번 인덱스를 만듭니다(약 0.15 USD).</div>",
                 unsafe_allow_html=True)
-    if st.button("▶ 선택한 agent로 QA 실행", type="primary", disabled=not chosen):
+    if st.button(f"▶ 체크한 agent {len(chosen)}개 실행", type="primary", disabled=not chosen):
         for a in chosen:
             exp = BA.start(a, limit, ",".join(sets) or None)
             st.toast(f"시작: {a['label']} → {exp}")
@@ -554,58 +638,57 @@ def page_agent_select():
         steps = {"queued": "대기", "checkout": "브랜치 코드 준비", "index": "인덱스 확인", "run": "답변 생성",
                  "grade": "채점", "evaluate": "지표 계산", "done": "완료"}
         st.dataframe(pd.DataFrame([{
-            "실험": j["experiment"], "agent": (j.get("entry") or {}).get("label"),
-            "상태": {"running": "⏳ 실행 중", "queued": "⏳ 대기", "done": "✅ 완료", "failed": "❌ 실패"}.get(j.get("status"), j.get("status")),
+            "agent": (j.get("entry") or {}).get("label"),
+            "상태": {"running": "⏳ 실행 중", "queued": "⏳ 대기 (동시 실행 3개까지)", "done": "✅ 완료", "failed": "❌ 실패",
+                   "stopped": "⏹ 중단됨"}.get(j.get("status"), j.get("status")),
             "단계": steps.get(j.get("step"), j.get("step")),
             "진행": f"{j.get('done_questions', '')}/{j.get('limit') or 90}" if j.get("status") == "running" else "",
-            "시작": j.get("started"), "오류": j.get("error", ""),
+            "시작": j.get("started"), "실험": j["experiment"], "오류": j.get("error", ""),
         } for j in jobs[:20]]), width="stretch", hide_index=True)
-        st.caption("5초마다 자동으로 갱신됩니다. 실행 로그: out/agent_runs/jobs/<실험>.log · 완료된 결과는 📋 log 페이지에서 비교합니다.")
+        st.caption("5초마다 자동으로 갱신됩니다. 실행 로그: out/agent_runs/jobs/<실험>.log · 끝나면 🏁 최종 시험 결과 페이지에서 비교합니다.")
 
     job_status()
 
 
-def page_log():
-    st.title("📋 log: agent 실행 비교")
-    hero("두 개 이상의 agent 실행을 한 표로 비교합니다",
-         "🤖 에이전트 선택에서 실행한 결과와, 저장소에 이미 있는 dev agent 결과를 함께 놓고 점수·비용·속도·세트별 점수·문항별 점수를 비교합니다.")
+def agent_runs() -> pd.DataFrame:
+    """Finished runs from the agent select page, newest first."""
     runs = [r for r in BA.read_log() if r["status"] == "done"]
-    failed = [r for r in BA.read_log() if r["status"] != "done"]
-    rows = []
-    for r in runs:
-        rows.append({**r, "출처": "실행 로그", "path": str(BA.RESULTS / r["experiment"])})
-    if st.toggle("저장소에 있는 dev agent 결과도 포함 (results/)", value=True):
-        for p in sorted(RESULTS.glob("dev_*/summary.json")):
-            s = json.loads(p.read_text(encoding="utf-8"))
-            if str(s.get("system", "")).startswith("agent") and (p.parent / "grades.jsonl").exists():
-                rows.append({"experiment": p.parent.name, "agent": f"(저장된 결과) {p.parent.name}", "branch": "현재 checkout",
-                             "commit": "", "config": s.get("config_file", ""), "started": s.get("created_at"), "minutes": None,
-                             **BA._scores(s), "출처": "results/", "path": str(p.parent)})
-    if not rows:
-        st.info("아직 비교할 실행이 없습니다. 🤖 에이전트 선택 페이지에서 agent를 실행하세요.")
+    if not runs:
+        return pd.DataFrame()
+    df = pd.DataFrame(runs).sort_values("started", ascending=False)
+    df["path"] = [str(BA.RESULTS / e) for e in df["experiment"]]
+    df["표시"] = df["branch"] + " agent (" + df["config"].str.removesuffix(".yaml") + ") · " + df["started"].str[5:16]
+    return df.reset_index(drop=True)
+
+
+def verdict(metrics: dict, grades: dict, common: list) -> str:
+    """One line: which agent leads, by how much, and whether the lead is beyond noise."""
+    from evalkit.paired import compare
+    order = sorted(metrics, key=lambda k: (-metrics[k]["정답 점수"], -metrics[k]["완전 정답률"], metrics[k]["USD/문항"]))
+    lead, second = order[0], order[1]
+    r = compare({q: grades[second][q] for q in common}, {q: grades[lead][q] for q in common}, max_score=2.0)
+    net = len(r["b_better"]) - len(r["a_better"])
+    if metrics[lead]["정답 점수"] == metrics[second]["정답 점수"] and net == 0:
+        cheaper = min(metrics, key=lambda k: metrics[k]["USD/문항"])
+        return (f"🤝 정답 점수 동률 ({metrics[lead]['정답 점수']:.3f}, {len(common)}문항) — 점수로는 우열이 없고, "
+                f"비용이 가장 낮은 것은 {cheaper} ({metrics[cheaper]['USD/문항']:.4f} USD/문항)입니다.")
+    changed = len(r["b_better"]) + len(r["a_better"])
+    sure = r["ci95"][0] > 0 and changed > 14 * len(common) / 90
+    tail = "차이가 잡음보다 커서 우세가 확실합니다." if sure else "다만 차이가 잡음 범위 안이라 확실한 우세는 아닙니다."
+    return (f"🏆 {lead} 우세 — 정답 점수 {metrics[lead]['정답 점수']:.3f} vs 2위 {second} {metrics[second]['정답 점수']:.3f} "
+            f"({len(common)}문항, 순증 {net:+d}, 95% 신뢰구간 [{r['ci95'][0]:+.3f}, {r['ci95'][1]:+.3f}]). {tail}")
+
+
+def agent_comparison():
+    st.subheader("🤖 브랜치 agent 비교 (dev 문항)")
+    df = agent_runs()
+    if df.empty:
+        st.info("아직 비교할 agent 실행이 없습니다. 🤖 에이전트 선택 페이지에서 agent를 체크하고 실행하세요.")
         return
-    df = pd.DataFrame(rows)
-    df["표시"] = df["agent"] + " · " + df["experiment"].str[-8:]
-
-    st.subheader("전체 실행 기록")
-    cols = {"표시": "실행", "branch": "브랜치", "commit": "커밋", "config": "설정", "n": "문항", "correctness": "정답 점수",
-            "fully_correct": "완전 정답률", "status_ok": "대응 일치율", "citation_on_target": "출처 일치율",
-            "usd_per_question": "USD/문항", "llm_per_question": "LLM 호출/문항", "p50": "p50 초", "p90": "p90 초",
-            "minutes": "걸린 분", "judge": "채점", "started": "시작", "출처": "출처"}
-    view = df[list(cols)].rename(columns=cols)
-    st.dataframe(view.style.format({"정답 점수": "{:.3f}", "완전 정답률": "{:.3f}", "대응 일치율": "{:.3f}", "출처 일치율": "{:.3f}",
-                                    "USD/문항": "{:.4f}", "LLM 호출/문항": "{:.2f}", "p50 초": "{:.1f}", "p90 초": "{:.1f}"},
-                                   na_rep="–"), width="stretch", hide_index=True)
-    if failed:
-        with st.expander(f"실패한 실행 {len(failed)}개"):
-            st.dataframe(pd.DataFrame(failed)[["started", "agent", "failed_step", "experiment"]], hide_index=True)
-
-    st.subheader("한눈에 비교")
-    logged = df[df["출처"] == "실행 로그"]["표시"].tolist()
-    default = logged[-4:] if len(logged) >= 2 else df["표시"].tolist()[:2]  # the latest runs made on the select page
-    picked = st.multiselect("비교할 실행 (2개 이상)", df["표시"].tolist(), default=default)
+    newest = df.drop_duplicates(["branch", "config"])  # latest run of each branch agent
+    picked = st.multiselect("비교할 실행 (기본: agent마다 가장 최근 실행)", df["표시"].tolist(), default=newest["표시"].tolist())
     if len(picked) < 2:
-        st.info("두 개 이상 고르면 비교표가 나옵니다.")
+        st.info("두 개 이상 고르면 비교와 한 줄 요약이 나옵니다.")
         return
     sel = df.set_index("표시").loc[picked]
     grades = {k: {g["qid"]: g["correctness"] for g in jsonl(str(Path(sel.loc[k, "path"]) / "grades.jsonl"))} for k in picked}
@@ -613,13 +696,10 @@ def page_log():
     if not common:
         st.warning("고른 실행들이 함께 푼 문항이 없습니다. 같은 문항 수로 실행한 것끼리 고르세요.")
         return
-    st.caption(f"고른 실행들이 함께 푼 문항 {len(common)}개로 다시 계산했습니다(문항 수가 다르면 공통 문항만 비교).")
-
     metrics = {}
     for k in picked:
         m = {x["qid"]: x for x in jsonl(str(Path(sel.loc[k, "path"]) / "metrics.jsonl")) if x["qid"] in common}
-        g = grades[k]
-        lat = sorted(m[q]["latency_s"] for q in common)
+        g, lat = grades[k], sorted(m[q]["latency_s"] for q in common)
         metrics[k] = {"정답 점수": sum(g[q] for q in common) / len(common) / 2,
                       "완전 정답률": sum(g[q] == 2 for q in common) / len(common),
                       "대응 일치율": sum(m[q].get("status_ok") or 0 for q in common) / len(common),
@@ -628,6 +708,9 @@ def page_log():
                       "LLM 호출/문항": sum(m[q]["n_llm_calls"] or 0 for q in common) / len(common),
                       "검색/문항": sum(m[q].get("n_searches") or 0 for q in common) / len(common),
                       "p90 초": lat[int(0.9 * (len(lat) - 1))]}
+
+    st.markdown(f'<div class="hero"><p><b>{verdict(metrics, grades, common)}</b></p></div>', unsafe_allow_html=True)
+
     cmp_ = pd.DataFrame(metrics)
     best = {"정답 점수": max, "완전 정답률": max, "대응 일치율": max, "출처 일치율": max, "USD/문항": min, "LLM 호출/문항": min,
             "검색/문항": min, "p90 초": min}
@@ -636,35 +719,207 @@ def page_log():
         b = best[row.name](row)
         return ["background-color:#dcfce7; color:#14532d; font-weight:700" if v == b else "" for v in row]
     st.dataframe(cmp_.style.apply(mark, axis=1).format("{:.3f}"), width="stretch")
-    st.caption("초록색 = 그 지표에서 가장 좋은 실행 (점수는 높을수록, 비용·호출·시간은 낮을수록).")
+    st.caption(f"고른 실행들이 함께 푼 dev 문항 {len(common)}개로 계산했습니다. 초록색 = 그 지표에서 가장 좋은 값 "
+               "(점수는 높을수록, 비용·호출·시간은 낮을수록). 위의 T1~T4 test 결과와 달리 dev 문항입니다.")
 
     from evalkit.paired import compare
-    base = picked[0]
+    order = sorted(metrics, key=lambda k: -metrics[k]["정답 점수"])
     pair = []
-    for k in picked[1:]:
-        r = compare({q: grades[base][q] for q in common}, {q: grades[k][q] for q in common}, max_score=2.0)
-        pair.append({"비교": f"{k}  vs  {base}", "점수 차이": r["diff"], "우세 / 열세 / 같음":
+    for k in order[1:]:
+        r = compare({q: grades[k][q] for q in common}, {q: grades[order[0]][q] for q in common}, max_score=2.0)
+        pair.append({"비교": f"{order[0]}  vs  {k}", "점수 차이": r["diff"], "1위 우세 / 열세 / 같음":
                      f"{len(r['b_better'])} / {len(r['a_better'])} / {r['same']}", "순증": len(r["b_better"]) - len(r["a_better"]),
                      "95% 신뢰구간": f"[{r['ci95'][0]:+.3f}, {r['ci95'][1]:+.3f}]",
-                     "판정": "차이 있음" if (r["ci95"][0] > 0 or r["ci95"][1] < 0) else "구별 안 됨"})
-    st.markdown(f"**짝비교 (기준: 처음 고른 실행 `{base}`)**")
+                     "판정": "차이 있음" if r["ci95"][0] > 0 else "구별 안 됨"})
+    st.markdown("**1위와 나머지 짝비교**")
     st.dataframe(pd.DataFrame(pair).style.format({"점수 차이": "{:+.3f}"}), width="stretch", hide_index=True)
-    st.caption("팀 규칙: 바뀐 문항이 잡음(90문항 중 14개)보다 많고 신뢰구간이 0을 포함하지 않아야 차이가 있다고 봅니다. "
-               "문항 수가 적으면 신뢰구간이 넓어 '구별 안 됨'이 나오기 쉽습니다.")
 
     by_set = pd.DataFrame({k: sel.loc[k, "by_set"] or {} for k in picked})
     if len(by_set):
         st.markdown("**세트별 정답 점수** (각 실행 전체 문항 기준)")
         st.dataframe(by_set.style.format("{:.3f}", na_rep="–"), width="stretch")
+    with st.expander("문항별 점수 (0~2)"):
+        golden = {i["qid"]: i for i in load_golden()}
+        grid = pd.DataFrame({k: {q: grades[k][q] for q in common} for k in picked})
+        if st.checkbox("점수가 갈린 문항만", value=True):
+            grid = grid[grid.nunique(axis=1) > 1]
+        grid.insert(0, "질문", [golden.get(q, {}).get("question", "")[:50] for q in grid.index])
+        st.dataframe(grid.style.background_gradient(cmap="RdYlGn", vmin=0, vmax=2, subset=picked), width="stretch")
 
-    st.markdown("**문항별 점수** (0~2, 실행마다 다른 문항만 보려면 체크)")
-    only_diff = st.checkbox("점수가 갈린 문항만", value=True)
-    golden = {i["qid"]: i for i in load_golden()}
-    grid = pd.DataFrame({k: {q: grades[k][q] for q in common} for k in picked})
-    if only_diff:
-        grid = grid[grid.nunique(axis=1) > 1]
-    grid.insert(0, "질문", [golden.get(q, {}).get("question", "")[:50] for q in grid.index])
-    st.dataframe(grid.style.background_gradient(cmap="RdYlGn", vmin=0, vmax=2, subset=picked), width="stretch")
+
+# ---------------------------------------------------------------- the agent being viewed (sidebar, every page)
+import agent as A  # noqa: E402  (repo root agent.py: Korean names for graph nodes, path of a run)
+
+A = fresh(A)
+
+VIEW_DEFAULT = "(팀 최종 결과 T1~T4)"
+
+
+def view_runs() -> pd.DataFrame:
+    """Latest finished run of each branch agent, numbered 1..N (the numbers stay the same on every page)."""
+    df = agent_runs()
+    if df.empty:
+        return df
+    df = df.drop_duplicates(["branch", "config"]).sort_values(["branch", "config"]).reset_index(drop=True)
+    df["번호"] = range(1, len(df) + 1)
+    df["이름"] = [f"{n}. {b} agent ({c.removesuffix('.yaml')})" for n, b, c in zip(df["번호"], df["branch"], df["config"])]
+    return df
+
+
+def current_agent():
+    """The run picked in the sidebar, or None for the team's T1~T4 results."""
+    df = view_runs()
+    name = st.session_state.get("view_agent")
+    if df.empty or name in (None, VIEW_DEFAULT) or name not in set(df["이름"]):
+        return None
+    return df.set_index("이름").loc[name]
+
+
+def agent_picker():
+    df = view_runs()
+    st.sidebar.divider()
+    st.sidebar.markdown("**🔎 볼 agent**")
+    if df.empty:
+        st.sidebar.caption("실행한 agent가 없습니다. 🤖 에이전트 선택에서 실행하면 여기서 골라 페이지마다 볼 수 있습니다.")
+        return
+    st.sidebar.selectbox("볼 agent", [VIEW_DEFAULT] + df["이름"].tolist(), key="view_agent", label_visibility="collapsed")
+    a = current_agent()
+    if a is not None:
+        st.sidebar.markdown(f"정답 점수 **{a['correctness']:.3f}** · 완전 정답 {a['fully_correct']:.0%}<br>"
+                            f"대응 일치 {a['status_ok']:.0%} · {a['n']:.0f}문항<br>"
+                            f"{a['usd_per_question']:.4f} USD/문항 · p90 {a['p90']:.1f}초", unsafe_allow_html=True)
+        st.sidebar.caption("페이지를 옮겨도 이 agent의 결과가 계속 표시됩니다.")
+
+
+def agent_banner():
+    a = current_agent()
+    if a is None:
+        if not view_runs().empty:
+            st.caption("👈 사이드바 '볼 agent'에서 실행한 agent를 고르면 이 페이지에 그 agent의 결과가 함께 나옵니다.")
+        return
+    st.markdown(f'<div class="note">지금 보는 agent: <b>{a.name}</b> · 커밋 {a["commit"]} · 정답 점수 <b>{a["correctness"]:.3f}</b> '
+                f'({a["n"]:.0f}문항, dev) · {a["usd_per_question"]:.4f} USD/문항 · 실행 {a["started"][5:16]}</div>',
+                unsafe_allow_html=True)
+
+
+def side_by_side(df: pd.DataFrame):
+    """All viewed runs as numbered columns on their common questions, the best value per metric in green."""
+    grades = {n: {g["qid"]: g["correctness"] for g in jsonl(str(Path(p) / "grades.jsonl"))} for n, p in zip(df["이름"], df["path"])}
+    common = sorted(set.intersection(*(set(g) for g in grades.values())))
+    if not common:
+        st.warning("실행들이 함께 푼 문항이 없습니다. 같은 문항 수로 실행한 것끼리 비교하세요.")
+        return None, grades, common
+    metrics = {}
+    for n, p in zip(df["이름"], df["path"]):
+        m = {x["qid"]: x for x in jsonl(str(Path(p) / "metrics.jsonl")) if x["qid"] in common}
+        g, lat = grades[n], sorted(m[q]["latency_s"] for q in common)
+        metrics[n] = {"정답 점수": sum(g[q] for q in common) / len(common) / 2,
+                      "완전 정답률": sum(g[q] == 2 for q in common) / len(common),
+                      "대응 일치율": sum(m[q].get("status_ok") or 0 for q in common) / len(common),
+                      "출처 일치율": pd.Series([m[q].get("citation_on_target") for q in common]).mean(),
+                      "USD/문항": sum(m[q]["usd"] for q in common) / len(common),
+                      "LLM 호출/문항": sum(m[q]["n_llm_calls"] or 0 for q in common) / len(common),
+                      "검색/문항": sum(m[q].get("n_searches") or 0 for q in common) / len(common),
+                      "p90 초": lat[int(0.9 * (len(lat) - 1))]}
+    best = {"정답 점수": max, "완전 정답률": max, "대응 일치율": max, "출처 일치율": max, "USD/문항": min, "LLM 호출/문항": min,
+            "검색/문항": min, "p90 초": min}
+
+    def mark(row):
+        b = best[row.name](row)
+        return ["background-color:#dcfce7; color:#14532d; font-weight:700" if v == b else "" for v in row]
+    st.dataframe(pd.DataFrame(metrics).style.apply(mark, axis=1).format("{:.3f}"), width="stretch")
+    st.caption(f"함께 푼 dev 문항 {len(common)}개 기준 · 초록색 = 그 지표에서 가장 좋은 값 (점수는 높을수록, 비용·호출·시간은 낮을수록)")
+    return metrics, grades, common
+
+
+@st.cache_data(show_spinner="그 브랜치 코드에서 LangGraph 흐름도를 꺼내는 중…")
+def graph_text(sha: str, config: str) -> str:
+    return BA.graph_of(sha, config)
+
+
+@st.cache_data(show_spinner=False)
+def mermaid_png(text: str):
+    try:
+        from langchain_core.runnables.graph_mermaid import draw_mermaid_png
+        return draw_mermaid_png(text)
+    except Exception:
+        return None
+
+
+def show_graph(a, path: list[str] | None = None, width: int | None = None):
+    try:
+        text = A.translate(graph_text(BA.sha_of(a), a["config"]), path)
+    except Exception as e:
+        st.warning(f"흐름도를 꺼내지 못했습니다: {e}")
+        return
+    png = mermaid_png(text)
+    if png:
+        st.image(png, width=width or "content")
+    else:
+        st.code(text, language="text")
+
+
+def follow_agent(a):
+    """Question-following page for the agent picked in the sidebar: its stored answer and path, every agent's
+    answer to the same question, and a live run with that branch's code."""
+    st.subheader(f"선택한 agent로 따라가기: {a.name}")
+    runs, grades, metrics = run_rows(a)
+    gold = {i["qid"]: i for i in load_golden()}
+    qids = sorted(runs)
+    qid = st.selectbox("이 agent가 푼 문항", qids, format_func=lambda q: f"{q} · {grades.get(q, {}).get('correctness', '-')}점 · {runs[q]['question'][:50]}")
+    r, g, m, item = runs[qid], grades.get(qid, {}), metrics.get(qid, {}), gold.get(qid, {})
+    left, right = st.columns([3, 2])
+    with left:
+        st.markdown(f"**질문** {r['question']}")
+        st.markdown(f"**답변** {pill(r['status'])} · 채점 **{g.get('correctness', '-')}점**", unsafe_allow_html=True)
+        st.write(r["answer"])
+        st.caption(f"채점 이유: {g.get('reason', '-')}")
+        st.markdown(f"LLM {r.get('n_llm_calls')}회 · 검색 {r.get('n_searches')}회 · {r.get('latency_s', 0):.1f}초 · "
+                    f"{m.get('usd', 0):.4f} USD")
+        st.markdown("**진행 과정**")
+        st.text("\n".join(A.describe(r)) or "(판단 기록 없음)")
+        with st.expander("기준 답안"):
+            st.write(item.get("target_answer", "-"))
+            st.write("정답 근거 쪽:", [f"{t['file']} p.{t['page']}" for t in item.get("targets", [])] or "문서에 없는 질문")
+    with right:
+        st.markdown("**지나간 노드 (노란색)**")
+        show_graph(a, A.visited_path(r.get("steps") or {}), width=360)
+    with st.expander("답변에 넘긴 조각 보기"):
+        show_chunks(r["context"], {c["chunk_id"] for c in r.get("citations", [])})
+
+    st.markdown("**같은 문항, agent별 답 한눈에 보기**")
+    rows = []
+    for _, o in view_runs().iterrows():
+        orun, ogr, _ = run_rows(o)
+        if qid in orun:
+            rows.append({"agent": o["이름"], "점수": ogr.get(qid, {}).get("correctness"),
+                         "응답": STATUS.get(orun[qid]["status"], (orun[qid]["status"],))[0],
+                         "LLM 호출": orun[qid].get("n_llm_calls"), "검색": orun[qid].get("n_searches"),
+                         "답변": orun[qid]["answer"][:300]})
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+
+    with st.expander("▶ 이 agent로 실시간 실행 (그 브랜치 코드로 API 호출, 약 0.01~0.02 USD)"):
+        q = st.text_input("질문", value=r["question"], key="follow_q")
+        scope = st.radio("검색 범위", ["B", "A"], horizontal=True, key="follow_scope",
+                         format_func=lambda s: {"A": "A (용어집+약관)", "B": "B (전체 23개)"}[s])
+        if st.button("실행", key="follow_run"):
+            with st.spinner("그 브랜치 코드로 실행 중… (10~40초)"):
+                try:
+                    res = BA.live_run(BA.sha_of(a), a["config"], q, scope)
+                except Exception as e:
+                    st.error(f"실행 실패: {e}")
+                    return
+            st.markdown(f"{pill(res['status'])} · LLM {res.get('n_llm_calls')}회 · 검색 {res.get('n_searches')}회 · "
+                        f"{res.get('latency_s')}초", unsafe_allow_html=True)
+            st.write(res["answer"])
+            st.text("\n".join(A.describe(res)))
+            show_graph(a, A.visited_path(res.get("steps") or {}), width=360)
+
+
+def run_rows(a) -> tuple[dict, dict, dict]:
+    p = Path(a["path"])
+    return ({r["qid"]: r for r in jsonl(str(p / "runs.jsonl"))}, {g["qid"]: g for g in jsonl(str(p / "grades.jsonl"))},
+            {m["qid"]: m for m in jsonl(str(p / "metrics.jsonl"))})
 
 
 def page_glossary():
@@ -690,7 +945,11 @@ def page_glossary():
 
 PAGES = {"🏠 처음 보는 분을 위한 요약": page_overview, "🤖 에이전트 선택": page_agent_select, "🧭 전체 흐름": page_flow,
          "📈 점수가 오른 과정": page_history, "✂️ 글을 자른 방식": page_chunks, "🔎 질문 따라가기 (실시간)": page_live,
-         "🏁 최종 시험 결과": page_test, "🧾 문항별 결과": page_results, "📋 log": page_log, "📖 용어 설명": page_glossary}
+         "🏁 최종 시험 결과": page_test, "🧾 문항별 결과": page_results, "📖 용어 설명": page_glossary}
 st.sidebar.title("📚 금융 문서 QA")
 refresh_agents()  # every app start / new browser session looks up the agents committed on the branches
-PAGES[st.sidebar.radio("메뉴", list(PAGES), label_visibility="collapsed")]()
+page = st.sidebar.radio("메뉴", list(PAGES), label_visibility="collapsed")
+agent_picker()
+if page not in ("🤖 에이전트 선택", "📖 용어 설명"):
+    agent_banner()
+PAGES[page]()
