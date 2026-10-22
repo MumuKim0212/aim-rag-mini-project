@@ -1,0 +1,10 @@
+base: 013b-rerank-lite.yaml
+name: 017c_lite_think_high
+card: experiments/017-answer-model.md
+compare_to: dev_013b_rerank_lite_fix
+description: "T4 chain, answer model gemini-3.5-flash-lite with thinking high; rerank fixed to gemini-3.5-flash-lite, thinking low (card 017, C)"
+answer:
+  thinking_level: high
+retrieval:
+  rerank_model: gemini-3.5-flash-lite
+  rerank_thinking_level: low
