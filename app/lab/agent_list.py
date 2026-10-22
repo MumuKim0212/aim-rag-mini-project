@@ -19,7 +19,8 @@ chosen = set(st.session_state.get("picked_agents", []))
 same = pd.Series([a["same_code_id"] for a in agents]).value_counts()
 table = pd.DataFrame([{
     "선택": a["label"] in chosen, "agent": a["label"], "설정": a["config"].removesuffix(".yaml"),
-    "올라온 시각": a["added_at"], "커밋": a["commit"], "작성자": a["author"], "답변 모델": a["answer_model"],
+    "만든 사람": a.get("maker", ""), "올라온 시각": a["added_at"], "커밋": a["commit"], "브랜치 마지막 커밋": a["author"],
+    "답변 모델": a["answer_model"],
     "결과": (lambda r, old: f"{r['n']}문항 · {r['correctness']:.3f}" if r else ("이전 버전 결과만 있음" if old else "없음"))(
         latest_run(a), latest_run(a, exact=False)),
     "같은 코드": f"{a['same_code_id']} ({same[a['same_code_id']]}개 같음)" if same[a["same_code_id"]] > 1 else a["same_code_id"],
@@ -32,6 +33,8 @@ picked_now = [a["label"] for a, on in zip(agents, edited["선택"]) if on]
 if picked_now != st.session_state.get("picked_agents"):
     st.session_state.picked_agents = picked_now
     st.rerun()
+st.caption("'만든 사람'은 그 agent 설정을 처음 커밋한 사람입니다. 다른 사람의 agent 파일을 비교용으로 복사해 온 것은 "
+           "그 브랜치의 agent로 치지 않고, 브랜치마다 그 브랜치에 원래 있던 agent 중 가장 최근 것을 보여 줍니다.")
 st.caption("'결과'는 이 PC에서 지금 목록의 agent(같은 코드·설정)를 마지막으로 실행한 결과(dev)입니다. 브랜치에 새 커밋이 올라와 "
            "코드가 바뀌면 '이전 버전 결과만 있음'으로 표시되고 다시 실행해야 비교에 들어갑니다. '같은 코드'가 같은 agent끼리는 "
            "코드와 설정이 완전히 같습니다.")

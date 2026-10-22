@@ -26,6 +26,7 @@ nav = st.navigation({
     "2. 청킹": [
         st.Page(P + "chunk_stats.py", title="청킹 방식별 청크", icon="✂️"),
         st.Page(P + "chunk_retrieval.py", title="청킹·검색 비교 (LLM 없이)", icon="🔍"),
+        st.Page(P + "chunk_llm.py", title="청킹·검색 비교 (LLM 사용 후)", icon="🧪"),
     ],
     "3. 실험": [
         st.Page(P + "exp_table.py", title="전체 실험 결과표", icon="📋"),

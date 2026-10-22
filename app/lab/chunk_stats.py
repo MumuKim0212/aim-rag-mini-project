@@ -2,31 +2,32 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from pathlib import Path
 
-from lab.common import ROOT, jsonl, kpi_row, pages, picked, picked_note, picked_runs, summary
+from lab.common import ROOT, agent_bars, chunk_frame, kpi_row, pages, picked, picked_note, picked_runs, styled, summary
 
 st.title("✂️ 청킹 방식별 청크")
 st.caption("같은 페이지 텍스트를 청킹 방식마다 어떻게 나누는지 비교합니다. 코드로 바로 청킹하므로 API를 쓰지 않습니다.")
 picked_note()
 if picked():
-    st.subheader("🤖 선택한 agent의 청킹·검색 설정")
-    runs = {r["label"]: r for r in picked_runs()}
-    rows_ = []
+    st.subheader("🤖 선택한 agent의 청킹 비교")
+    runs = picked_runs()
+    by_label = {r["label"]: r for r in runs}
+    settings = {}
     for n, a in enumerate(picked(), 1):
-        ch, r = a["chunking"], runs.get(a["label"])
-        used = {}
-        if r:
-            for run in jsonl(str(Path(r["path"]) / "runs.jsonl")):
-                for u in run.get("context") or []:
-                    used[u["chunk_id"]] = len(u["content"])
+        ch, r = a["chunking"], by_label.get(a["label"])
         rt = (summary(r["experiment"]).get("config") or {}).get("retrieval", {}) if r else {}
-        rows_.append({"agent": f"{n}. {a['label']}", "방식": ch.get("method"), "크기/겹침": f"{ch.get('chunk_size')}/{ch.get('chunk_overlap')}",
-                      "조항 최대 글자": ch.get("max_chars"), "머리말": ch.get("add_header", False), "검색": rt.get("method", "–"),
-                      "k / 재정렬 후보": f"{rt.get('k', '–')} / {rt.get('rerank_pool') or '–'}",
-                      "답에 쓴 조각": len(used) or None, "그 조각 평균 길이": round(sum(used.values()) / len(used)) if used else None})
-    st.dataframe(pd.DataFrame(rows_), hide_index=True, width="stretch")
-    st.caption("설정은 각 agent 브랜치의 config 파일 값이고, '답에 쓴 조각'은 그 agent의 dev 실행에서 답변 단계에 넘어간 조각입니다.")
+        settings[f"{n}. {a['label']}"] = {"청킹 방식": ch.get("method"), "크기 / 겹침": f"{ch.get('chunk_size')} / {ch.get('chunk_overlap')}",
+                                          "조항 최대 글자": ch.get("max_chars", "–"), "머리말": ch.get("add_header", False),
+                                          "검색": rt.get("method", "–"), "k / 재정렬 후보": f"{rt.get('k', '–')} / {rt.get('rerank_pool') or '–'}"}
+    st.markdown("**설정** (각 agent 브랜치의 config 값)")
+    st.dataframe(pd.DataFrame(settings).astype(str), width="stretch")
+    if runs:
+        df, common = chunk_frame(runs)
+        st.markdown(f"**실행 결과로 본 청킹 수치** (함께 푼 dev 문항 {len(common)}개, agent마다 한 열)")
+        st.dataframe(styled(df, "{:,.3f}"), width="stretch")
+        agent_bars(df, ["정답 페이지 포함", "근거 문장 포함률", "문항당 넘긴 조각 수", "조각 평균 길이", "문항당 문맥 글자 수"])
+        st.caption("정답 페이지 포함·근거 문장 포함률은 높을수록 좋습니다. 조각 수·길이·문맥 글자 수는 좋고 나쁨이 아니라 "
+                   "청킹 방식의 차이를 보여 줍니다(길수록 근거는 많이 담지만 비용이 늘어남).")
     st.divider()
 
 CHUNKERS = {

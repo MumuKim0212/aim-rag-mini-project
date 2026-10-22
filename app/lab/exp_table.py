@@ -1,10 +1,11 @@
 import streamlit as st
 
-from lab.common import picked_note, summary_table
+from lab.common import picked_compare, picked_note, summary_table
 
 st.title("📋 전체 실험 결과표")
 st.caption("results/ 폴더의 모든 실험 요약(summary.json)과, agent_list에서 고른 agent의 실행(🤖)입니다. 열 제목을 누르면 정렬됩니다.")
 picked_note()
+picked_compare("선택한 agent 실험 결과 나란히 보기")
 
 t = summary_table()
 c1, c2, c3 = st.columns(3)

@@ -2,12 +2,16 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from lab.common import SETS, golden, graded, label, paired, picked_note, picked_runs, rows, summary
+from lab.common import SETS, golden, graded, label, paired, picked_compare, picked_note, picked_runs, rows, summary
 
 st.title("⚖️ 두 실험 짝비교")
 st.caption("같은 문항을 두 실험이 각각 몇 점 받았는지 문항별로 짝지어 비교합니다(`scripts/compare.py`와 같은 계산). "
            "agent_list에서 고른 agent(🤖)는 목록 맨 앞에 있습니다.")
 picked_note()
+if len(picked_runs()) >= 2:
+    picked_compare("선택한 agent 전부 한 번에 비교")
+    st.divider()
+    st.subheader("두 개씩 자세히")
 
 split = st.radio("split", ["dev", "test"], horizontal=True)
 mine = [r["experiment"] for r in picked_runs()] if split == "dev" else []

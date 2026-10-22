@@ -2,22 +2,19 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from lab.common import paired, picked_note, picked_runs, summary, summary_table
+from lab.common import agent_bars, chunk_frame, paired, picked_note, picked_runs, styled, summary_table
 
 st.title("🔍 청킹·검색 비교 (LLM 없이)")
 st.caption("답변을 만들지 않고 검색 결과만 채점한 실험들입니다(`--retrieval-only`). 정답 페이지와 근거 문장이 "
            "검색 결과 상위 5개에 들어왔는지로 청킹·검색 방식을 비교합니다. 비용은 질문 임베딩뿐입니다.")
 picked_note()
 if picked_runs():
-    st.subheader("🤖 선택한 agent의 검색 성능 (각 agent의 dev 실행, 최종 문맥 기준)")
-    st.dataframe(pd.DataFrame([{
-        "agent": r["name"], "문항": r["n"], "정답 페이지 포함": summary(r["experiment"])["retrieval"].get("page_hit"),
-        "근거 문장 포함률": summary(r["experiment"])["retrieval"].get("evid"), "MRR": summary(r["experiment"])["retrieval"].get("mrr"),
-        "문맥 글자 수": summary(r["experiment"])["retrieval"].get("chars"), "검색/문항": r.get("searches_per_question"),
-    } for r in picked_runs()]).style.format({"정답 페이지 포함": "{:.3f}", "근거 문장 포함률": "{:.3f}", "MRR": "{:.3f}",
-                                              "문맥 글자 수": "{:,.0f}", "검색/문항": "{:.2f}"}, na_rep="–"),
-                 width="stretch", hide_index=True)
-    st.caption("agent는 재검색으로 문맥을 늘리므로 아래 검색만 비교한 실험(상위 5개)과 기준이 다릅니다. agent끼리 비교할 때 보세요.")
+    df_, common_ = chunk_frame(picked_runs())
+    st.subheader("🤖 선택한 agent의 검색 성능 (LLM 채점 없이 계산하는 지표)")
+    st.dataframe(styled(df_, "{:,.3f}"), width="stretch")
+    agent_bars(df_, ["정답 페이지 포함", "근거 문장 포함률", "MRR", "검색/문항"])
+    st.caption(f"함께 푼 dev 문항 {len(common_)}개 기준. agent는 재검색으로 문맥을 늘리므로 아래 표(상위 5개만 본 검색 실험)와 기준이 "
+               "다릅니다. 같은 문항으로 LLM이 답하고 채점한 결과는 '청킹·검색 비교 (LLM 사용 후)'에 있습니다.")
     st.divider()
 
 with st.expander("지표 설명"):

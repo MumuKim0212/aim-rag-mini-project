@@ -142,11 +142,61 @@ def compare_runs(runs: list[dict]) -> tuple[pd.DataFrame, dict, list]:
     return pd.DataFrame(cols), grades, common
 
 
-def styled(df: pd.DataFrame):
+HIGHER = {"정답 점수", "완전 정답률", "대응 일치율", "출처 일치율", "근거 문장 포함률", "정답 페이지 포함", "MRR", "정답 청크 수"}
+LOWER = {"USD/문항", "LLM 호출/문항", "검색/문항", "p90 초", "p50 초", "토큰/문항"}
+GOOD = "background-color:#dcfce7; color:#14532d; font-weight:700"
+BAD = "background-color:#fee2e2; color:#7f1d1d; font-weight:700"
+PALETTE = ["#2563eb", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#06b6d4"]
+
+
+def styled(df: pd.DataFrame, digits: str = "{:.3f}"):
+    """Rows = metrics, columns = agents: best value green, worst red (higher or lower is better per metric;
+    rows that are neither, e.g. counts, are left plain)."""
     def mark(row):
-        b = BEST.get(row.name, max)(row)
-        return ["background-color:#dcfce7; color:#14532d; font-weight:700" if v == b else "" for v in row]
-    return df.style.apply(mark, axis=1).format("{:.3f}", na_rep="–")
+        vals = pd.to_numeric(row, errors="coerce")
+        if row.name not in HIGHER | LOWER or vals.nunique() < 2:
+            return [""] * len(row)
+        good, bad = (vals.max(), vals.min()) if row.name in HIGHER else (vals.min(), vals.max())
+        return [GOOD if v == good else BAD if v == bad else "" for v in vals]
+    return df.style.apply(mark, axis=1).format(digits, na_rep="–")
+
+
+def colors(names: list[str]):
+    """One fixed color per picked agent, the same on every page (by its number)."""
+    import altair as alt
+    return alt.Scale(domain=names, range=[PALETTE[(int(n.split(".")[0]) - 1) % len(PALETTE)] if n[:1].isdigit()
+                                          else "#94a3b8" for n in names])
+
+
+def agent_bars(df: pd.DataFrame, metrics: list[str], height: int = 170):
+    """Grouped bars: one panel per metric, one bar per agent (column of df); best bar outlined in green, worst in
+    red, so three agents' values sit next to each other on the same scale."""
+    import altair as alt
+    rows_ = []
+    for m in metrics:
+        if m not in df.index:
+            continue
+        vals = pd.to_numeric(df.loc[m], errors="coerce")
+        judged = m in HIGHER | LOWER  # sizes and lengths are neither better nor worse: no outline
+        good = vals.max() if m not in LOWER else vals.min()
+        bad = vals.min() if m not in LOWER else vals.max()
+        for agent, v in vals.items():
+            rows_.append({"지표": m + (" (낮을수록 좋음)" if m in LOWER else "" if judged else " (참고)"), "agent": agent, "값": v,
+                          "판정": "" if not judged or good == bad else "최고" if v == good else "최저" if v == bad else ""})
+    data = pd.DataFrame(rows_)
+    if data.empty:
+        return
+    base = alt.Chart(data).encode(
+        x=alt.X("agent:N", title=None, axis=alt.Axis(labels=False, ticks=False)),
+        y=alt.Y("값:Q", title=None), color=alt.Color("agent:N", scale=colors(list(df.columns)), legend=alt.Legend(orient="bottom", title=None)),
+        tooltip=["지표", "agent", alt.Tooltip("값:Q", format=".4f"), "판정"])
+    bars = base.mark_bar(strokeWidth=3).encode(
+        stroke=alt.Stroke("판정:N", scale=alt.Scale(domain=["최고", "최저", ""], range=["#16a34a", "#dc2626", "transparent"]),
+                          legend=None))
+    labels = base.mark_text(dy=-6, fontSize=11).encode(text=alt.Text("값:Q", format=".3~f"))
+    st.altair_chart((bars + labels).properties(width=150, height=height).facet(
+        facet=alt.Facet("지표:N", title=None), columns=4).resolve_scale(y="independent"))
+    st.caption("막대 하나 = agent 하나 (색은 모든 페이지에서 같음). 초록 테두리 = 그 지표에서 가장 좋은 agent, 빨간 테두리 = 가장 나쁜 agent.")
 
 
 def verdict(df: pd.DataFrame, grades: dict, common: list) -> str:
@@ -168,7 +218,7 @@ def verdict(df: pd.DataFrame, grades: dict, common: list) -> str:
             + ("차이가 잡음보다 커서 우세가 확실합니다." if sure else "다만 차이가 잡음 범위 안이라 확실한 우세는 아닙니다."))
 
 
-def picked_compare(title: str = "선택한 agent 비교 (dev)"):
+def picked_compare(title: str = "선택한 agent 비교 (dev)", bars: bool = True):
     """Side-by-side table of the picked runs with the verdict; nothing when fewer than one run."""
     runs = picked_runs()
     if not runs:
@@ -181,7 +231,29 @@ def picked_compare(title: str = "선택한 agent 비교 (dev)"):
     if df.shape[1] >= 2:
         st.success(verdict(df, grades, common))
     st.dataframe(styled(df), width="stretch")
-    st.caption(f"함께 푼 dev 문항 {len(common)}개 기준 · 초록색 = 그 지표에서 가장 좋은 값 (점수는 높을수록, 비용·호출·시간은 낮을수록)")
+    st.caption(f"함께 푼 dev 문항 {len(common)}개 기준 · 초록 = 그 지표에서 가장 좋은 agent, 빨강 = 가장 나쁜 agent "
+               "(점수는 높을수록, 비용·호출·시간은 낮을수록 좋음)")
+    if bars:
+        agent_bars(df, ["정답 점수", "완전 정답률", "대응 일치율", "출처 일치율", "USD/문항", "LLM 호출/문항", "p90 초"])
+
+
+def chunk_frame(runs: list[dict]) -> tuple[pd.DataFrame, list]:
+    """Chunking and retrieval numbers of the picked runs on their common questions (columns = agents)."""
+    sets = [{r_["qid"] for r_ in jsonl(str(Path(r["path"]) / "metrics.jsonl"))} for r in runs]
+    common = sorted(set.intersection(*sets)) if sets else []
+    cols = {}
+    for r in runs:
+        m = {x["qid"]: x for x in jsonl(str(Path(r["path"]) / "metrics.jsonl")) if x["qid"] in common}
+        ctx = {x["qid"]: x.get("context") or [] for x in jsonl(str(Path(r["path"]) / "runs.jsonl")) if x["qid"] in common}
+        used = {u["chunk_id"]: len(u["content"]) for c in ctx.values() for u in c}
+        answerable = [q for q in common if m[q].get("page_hit") is not None]
+        mean = lambda k, qs: (sum(m[q].get(k) or 0 for q in qs) / len(qs)) if qs else None  # noqa: E731
+        cols[r["name"]] = {
+            "정답 페이지 포함": mean("page_hit", answerable), "근거 문장 포함률": mean("evid", answerable),
+            "MRR": mean("mrr", answerable), "문항당 문맥 글자 수": mean("chars", common),
+            "문항당 넘긴 조각 수": sum(len(c) for c in ctx.values()) / len(common) if common else None,
+            "조각 평균 길이": sum(used.values()) / len(used) if used else None, "검색/문항": mean("n_searches", common)}
+    return pd.DataFrame(cols), common
 
 
 def picked_note():

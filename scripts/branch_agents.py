@@ -96,7 +96,7 @@ def scan(fetch: bool = True) -> list[dict]:
     cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
     found, blobs = [], None
     for branch, sha in branches(fetch):
-        if sha not in cache or any("first_added" not in e for e in cache[sha]["agents"]):
+        if sha not in cache or any("maker" not in e for e in cache[sha]["agents"]):
             blobs = blobs or Blobs()
             files = [f.split("/")[-1] for f in git("ls-tree", "--name-only", sha, "configs/").split()
                      if f.endswith(".yaml")]
@@ -116,11 +116,13 @@ def scan(fetch: bool = True) -> list[dict]:
                 # when the config first appeared on this branch, and what the agent is (config + its implementation
                 # file), so a copy of another teammate's agent can be told from the branch's own (latest_per_branch)
                 first = git("log", "--diff-filter=A", "--format=%ct", sha, "--", f"configs/{f}").split()
+                makers = git("log", "--diff-filter=A", "--format=%an", sha, "--", f"configs/{f}").splitlines()
                 impl = "src/rag/agent_repair.py" if system == "agent_repair" else "src/rag/agent.py"
                 origin = hashlib.sha1(json.dumps([git("rev-parse", f"{sha}:{impl}").strip(), cfg], sort_keys=True,
                                                  default=str).encode()).hexdigest()[:8]
                 entries.append({"config": f, "name": cfg.get("name"), "system": system, "added": added,
                                 "first_added": int(first[-1]) if first else added, "origin_key": origin,
+                                "maker": makers[-1] if makers else "",  # who first committed this agent's config
                                 "description": cfg.get("description", ""), "answer_model": cfg.get("answer", {}).get("model"),
                                 "chunking": cfg.get("chunking", {}), "card": cfg.get("card"), "same_code_id": ident,
                                 "judge": cfg.get("judge", {})})
