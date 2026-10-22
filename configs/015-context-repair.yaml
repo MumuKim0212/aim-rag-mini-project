@@ -1,0 +1,10 @@
+base: 008b-agent-950.yaml
+name: 015_context_repair
+card: experiments/015-context-repair.md
+compare_to: dev_008b_agent950
+description: "T3 agent with context repair: diagnose (cut / not_found / garbled) -> expand cut chunks to the page and re-check, re-search, or flag the page (card 015)"
+system: agent_repair
+agent:
+  max_expand: 1                 # expand_context rounds per question
+  max_expand_pages: 3           # pages per round
+  max_context_chars: 20000      # context cap after expansion

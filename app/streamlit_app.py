@@ -4,13 +4,16 @@
 
 Pages: overview, how it works, try it yourself (live run with the node path drawn as it happens), score history,
 chunking, final test, per-question results, lessons, glossary. The live page calls the Gemini API (needs .env) and
-uses the indexes in out/index (scripts/build_index.py). It runs dev questions or free text, never the test split.
+uses the indexes in out/index (scripts/build_index.py). It runs one teammate's version or two side by side
+(Serin-91: final T4; LimDaeJin: card 015 repair agent) on free text or any golden question; test questions are
+offered because the final test (workflow step 8) is done.
 """
 
 import json
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
+from unicodedata import normalize
 
 import pandas as pd
 import streamlit as st
@@ -26,9 +29,10 @@ from rag.golden import load_golden, scope_of  # noqa: E402
 from rag.retrieval import index_dir  # noqa: E402
 
 CFG_LITE = "configs/013b-rerank-lite.yaml"      # final system (T4): gemini-3.5-flash-lite + prompt v4 + rerank
-CFG_FLASH = "configs/013-rerank-flash36.yaml"   # T2: gemini-3.6-flash
-CFG_AGENT = "configs/008b-agent-950.yaml"       # T3
-CFG_AGENT_V2 = "configs/014-agent-v2.yaml"      # card 014, not adopted
+CFG_REPAIR = "configs/015-context-repair.yaml"  # LimDaeJin's card 015: T3 agent + context repair
+# Henry's final setup (configs/011-lite31-prompt2.yaml on branch Henry) needs his own chunking / retrieval / prompt code,
+# so it runs in a separate checkout of that commit (app/run_checkout.py), next to this repo
+HENRY_DIR, HENRY_COMMIT, CFG_HENRY = ROOT.parent / "rag_mini_project-henry", "a39a5e3", "configs/011-lite31-prompt2.yaml"
 CFG_BASE = "configs/baseline.yaml"
 RESULTS = ROOT / "results"
 
@@ -90,6 +94,12 @@ def cfg_of(path: str) -> dict:
 @st.cache_data
 def summary_of(exp: str):
     p = RESULTS / exp / "summary.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+
+
+@st.cache_data
+def summary_of_path(path: str):
+    p = Path(path)
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
@@ -189,6 +199,15 @@ AGENT_EDGES = [("start", "classify", ""), ("classify", "retrieve", ""), ("retrie
                ("generate", "cite_check", ""), ("cite_check", "generate", "번호가 틀림\n(1번 다시)"), ("cite_check", "end", "통과")]
 V2_NODES = [("check", "답 검사 (다른 AI)\n빠진 내용? 없는 숫자?")]
 V2_EDGES = [("cite_check", "check", "통과 (첫 답)"), ("check", "generate", "고칠 점 있음\n(1번만 고쳐 쓰기)"), ("check", "end", "문제 없음")]
+REPAIR_NODES = AGENT_NODES[:2] + [("diagnose", "근거 진단\n(충분? 잘림? 못 찾음? 깨짐?)"),
+                                  ("expand_context", "잘린 조각을\n페이지 전체로 넓히기 (1번)"),
+                                  ("flag_page", "깨진 쪽 표시\n(나중에 다시 추출)")] + AGENT_NODES[3:]
+REPAIR_EDGES = [("start", "classify", ""), ("classify", "retrieve", ""), ("retrieve", "diagnose", ""),
+                ("diagnose", "expand_context", "잘림"), ("expand_context", "diagnose", "다시 진단"),
+                ("diagnose", "rewrite", "못 찾음"), ("rewrite", "retrieve", ""), ("diagnose", "flag_page", "깨짐"),
+                ("flag_page", "generate", ""), ("diagnose", "generate", "충분해요\n(또는 3번 다 찾음)")] + AGENT_EDGES[6:]
+HENRY_NODES = [("search", "조각 5개 찾기\n(뜻 검색)"), ("generate", "답 쓰기 + 출처 붙이기")]
+HENRY_EDGES = [("start", "search", ""), ("search", "generate", ""), ("generate", "end", "")]
 RAG_NODES = [("search", "후보 15개 찾기\n(뜻 비슷 + 단어 일치)"), ("rerank", "AI가 5개 고르기"), ("generate", "답 쓰기 + 출처 붙이기")]
 RAG_EDGES = [("start", "search", ""), ("search", "rerank", ""), ("rerank", "generate", ""), ("generate", "end", "")]
 
@@ -305,10 +324,17 @@ TYPE_TEXT = {"document": "문서를 찾아 답할 수 있는 질문", "needs_inf
              "inappropriate": "해서는 안 되는 요청 (상품 추천, 수익 예측 등)", "injection": "규칙을 어기라는 지시가 섞인 질문"}
 
 EXAMPLES = [("POS001", "보통 질문"), ("NEG037", "다시 찾기가 일어나는 질문"), ("NEG013", "정보를 더 물어봐야 하는 질문"),
-            ("NEG004", "거절해야 하는 질문"), ("POS045", "(버린 시도 v2용) 답 검사 후 고쳐 쓴 질문")]
+            ("NEG004", "거절해야 하는 질문")]
 
-SYSTEMS = {"★ T4 최종 시스템 (작은 AI, 칸 3개)": ("rag", CFG_LITE), "T2 개선판 (큰 AI, 칸 3개) · 비교용": ("rag", CFG_FLASH),
-           "T3 Agent (스스로 점검, 큰 AI) · 비교용": ("agent", CFG_AGENT), "Agent v2 (+ 답 검사 칸) · 버린 시도": ("agent", CFG_AGENT_V2)}
+# one version per teammate; the flow drawn on the live page follows the kind
+SYSTEMS = {"★ Serin-91 · 최종 시스템 T4 (작은 AI, 칸 3개)": ("rag", CFG_LITE),
+           "LimDaeJin · 근거 복구 Agent (카드 015, 큰 AI)": ("repair", CFG_REPAIR),
+           "Henry · 기본 RAG + 구조 청킹 (카드 011, 작은 AI 3.1)": ("checkout", CFG_HENRY)}
+FLOWS = {"rag": (RAG_NODES, RAG_EDGES), "repair": (REPAIR_NODES, REPAIR_EDGES), "checkout": (HENRY_NODES, HENRY_EDGES)}
+# golden-set groups offered on the live page; the archived 20-question draft (set "self") is left out
+GOLDEN_GROUPS = {"제공 세트 · 연습(dev) 90문항": lambda i: i["split"] == "dev",
+                 "제공 세트 · 시험(test) 90문항": lambda i: i["split"] == "test" and i["set"] not in ("self", "self2"),
+                 "자작 세트 self2 · 41문항": lambda i: i["set"] == "self2"}
 
 
 def show_chunks(units, picked_ids=None, limit=None):
@@ -320,12 +346,12 @@ def show_chunks(units, picked_ids=None, limit=None):
                     unsafe_allow_html=True)
 
 
-def cost_row(steps: dict, searches: int):
+def cost_row(steps: dict, searches: int, narrow: bool = False):
     prices = load_prices()
     calls = steps.get("calls", [])
     usd = sum(call_usd(c, prices) for c in calls)
     sec = sum(c["seconds"] for c in calls)
-    a, b, c, d = st.columns(4)
+    a, b, c, d = [*st.columns(2), *st.columns(2)] if narrow else st.columns(4)  # 2 x 2 in a half-width column
     a.metric("AI를 부른 횟수", f"{sum(1 for x in calls if x['kind'] == 'llm')}번")
     b.metric("문서를 찾은 횟수", f"{searches}번")
     c.metric("걸린 시간", f"{sec:.1f}초")
@@ -372,6 +398,25 @@ def describe(node: str, n: int, state: dict, steps: dict):
             more = "검색어를 바꿔 다시 찾아요." if d.get("research", 0) < cfg_of(state["_cfg"])["agent"]["max_research"] else "이미 3번 찾았으니 있는 근거로 답을 씁니다."
             box.write(f"→ **부족해요.** {more}")
             box.caption(f"부족한 점: {d.get('missing', '')}")
+    elif node == "diagnose":
+        d = last_decision(steps, "diagnose")
+        box = step_box(n, "근거 진단")
+        cause = {"cut": "조각이 중간에 잘렸어요", "not_found": "맞는 문서를 못 찾았어요", "garbled": "글자가 깨져 있어요"}
+        if "skipped" in d:
+            box.write("→ 이런 종류의 질문은 근거를 따지지 않고 바로 답 쓰기로 가요.")
+        elif d.get("sufficient"):
+            box.write("→ **충분해요.** 답 쓰기로 갑니다.")
+        else:
+            box.write(f"→ **부족해요: {cause.get(d.get('cause'), d.get('cause'))}.** 관련 있는 조각 번호: {d.get('relevant', [])}")
+            box.caption(f"부족한 점: {d.get('missing', '')}")
+    elif node == "expand_context":
+        d = last_decision(steps, "expand_context")
+        box = step_box(n, "잘린 조각을 페이지 전체로 넓히기")
+        box.write(f"넓힌 쪽: **{[f'{f} p.{p}' for f, p in d.get('pages', [])] or '없음'}** · 근거 글자 수 {d.get('chars', 0):,}자")
+    elif node == "flag_page":
+        d = last_decision(steps, "flag_page")
+        box = step_box(n, "깨진 쪽 표시")
+        box.write(f"나중에 다시 추출할 쪽: **{[f'{f} p.{p}' for f, p in d.get('pages', [])]}** · 지금 있는 근거로 답을 씁니다.")
     elif node == "rewrite":
         d = last_decision(steps, "rewrite")
         box = step_box(n, "검색어 바꾸기")
@@ -400,7 +445,7 @@ def describe(node: str, n: int, state: dict, steps: dict):
 def run_agent_live(cfg_path: str, question: str, scope: str, graph_slot, log):
     from rag.rag import format_answer
     ag = system_of(cfg_path)
-    nodes, edges = (AGENT_NODES + V2_NODES, AGENT_EDGES + V2_EDGES) if ag.check else (AGENT_NODES, AGENT_EDGES)
+    nodes, edges = FLOWS["repair"]
     steps = {"calls": []}
     state = {"question": question, "scope": scope, "steps": steps}
     path = ["start"]
@@ -456,67 +501,252 @@ def run_rag_live(cfg_path: str, question: str, scope: str, graph_slot, log):
         box.markdown(pill(out.status), unsafe_allow_html=True)
     path.append("end")
     graph_slot.graphviz_chart(flow_chart(RAG_NODES, RAG_EDGES, path), width="stretch")
-    return {"status": out.status, "answer": format_answer(out.answer, citations), "context": picked, "citations": citations,
+    return {"status": out.status, "answer": format_answer(out.answer, citations), "context": picked, "pool": pool, "citations": citations,
             "steps": steps, "searches": 1, "reason": "정상적으로 끝났어요", "path": path}
 
 
-def page_live():
-    st.title("💬 직접 검색해서 써보기")
-    st.write("궁금한 금융 질문을 넣어 보세요. 시스템이 **어떤 칸을 어떤 순서로 지나가는지** 왼쪽 그림에 실시간으로 표시되고, "
-             "오른쪽에는 칸마다 무엇을 판단했는지가 쉬운 말로 쌓입니다. 기본은 **최종 시스템(T4)**이고, "
-             "Agent(T3)를 고르면 ‘근거가 부족하면 다시 찾기’ 같은 갈림길도 볼 수 있습니다.")
-    st.caption("실제로 AI를 부릅니다. 질문 하나에 약 0.004~0.02달러(5~25원) 듭니다. 시험 문제는 쓰지 않습니다. 같은 질문도 매번 조금씩 다르게 흘러갈 수 있습니다.")
-    dev = {i["qid"]: i for i in load_golden(split="dev")}
-    ex = {f"{label} · {dev[q]['question'][:40]}…": q for q, label in EXAMPLES if q in dev}
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        pick = st.selectbox("예시 질문 (직접 써도 됩니다)", ["(직접 입력)"] + list(ex))
-    with c2:
-        mode = st.radio("어떤 도우미로 답할까요?", list(SYSTEMS), index=0,
-                        help="제출하는 시스템은 T4입니다. 나머지는 비교해 보라고 넣어 둔 것입니다. 칸이 많은 Agent를 고르면 갈림길과 되돌아가는 길이 보입니다.")
-    item = dev[ex[pick]] if pick in ex else None
-    question = st.text_area("질문", value=item["question"] if item else "", height=90,
-                            placeholder="예: 휴면성 증권계좌는 어떤 계좌인가요?  /  주택연금은 몇 살부터 가입할 수 있나요?")
+def saved_accuracy(kind: str) -> str:
+    if kind == "rag":
+        f = final_stats("T4")
+        return (f"저장된 정확도 (0~1): 연습 90문항 **{score('dev_013b_rerank_lite_fix'):.3f}** · "
+                f"최종 시험 {f['n']}문항 **{f['score']:.3f}**" if f else "저장된 정확도: 결과 파일 없음")
+    if kind == "checkout":
+        p = HENRY_DIR / "results/dev_011_lite31_prompt2/summary.json"
+        s = json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+        return (f"저장된 정확도 (0~1): 연습 {s['n_questions']}문항 **{s['scores']['correctness_mean']:.3f}** "
+                "(Henry 브랜치의 결과, 시험 문제는 돌리지 않음)" if s else "저장된 정확도: Henry 버전 폴더 없음")
+    return ("저장된 정확도: **없음.** 카드 015는 사전 점검 기준(개선 여지 3문항 이상)을 못 넘어 연습 문제 전체를 돌리지 않았고, "
+            "연습 문제 3개로 동작만 확인했습니다. 골든셋 문항을 골라 아래 문항별 채점으로 비교해 보세요.")
+
+
+def live_grade(item: dict, res: dict):
+    """Grade one live answer with the frozen judge (same prompt and model as the batch runs)."""
+    from rag.judge import grade
+    with st.spinner("채점 중…"):
+        g = grade(item, {"status": res["status"], "answer": res["answer"]}, cfg_of(CFG_LITE))  # one judge setup for all
+    usd = sum(call_usd(c, load_prices()) for c in g["calls"])
+    st.markdown(f"**채점: {g['correctness']}점 / 2점** ({ {0: '틀림', 1: '일부 맞음', 2: '정답'}[g['correctness']] })")
+    st.caption(f"채점 이유: {g['reason']} · 채점 비용 {usd:.4f}달러 (위 비용에 안 들어감)")
+    stage = failed_stage(item, res["context"], g["correctness"], res.get("pool"))
+    if stage:
+        st.markdown(f"**막힌 단계: {stage}** — {STAGE_HELP[stage]}")
+
+
+def live_run(mode: str, question: str | None, scope: str, area, wide: bool, item: dict | None = None):
+    """Draw one version's flow, step cards and final answer into `area`; question None draws the empty flow.
+    With a golden item the answer is graded by the judge."""
     kind, cfg_path = SYSTEMS[mode]
-    default_scope = scope_of(item, cfg_of(cfg_path)) if item else "B"
-    scope = st.radio("찾을 문서", ["B", "A"], index=0 if default_scope == "B" else 1, horizontal=True,
-                     format_func=lambda s: "전체 23개 문서" if s == "B" else "용어집·약관만 (기본 문제 세트의 조건)")
-    st.markdown(LEGEND, unsafe_allow_html=True)
-    run = st.button("▶ 검색하고 답 받기", type="primary")
-    left, right = st.columns([5, 6])
+    area.caption(saved_accuracy(kind))
+    with area:
+        left, right = st.columns([5, 6]) if wide else (st.container(), st.container())
     with left:
         st.markdown("#### 지나가는 길")
         graph_slot = st.empty()
     with right:
         st.markdown("#### 칸마다 한 일")
         log = st.container()
-    nodes, edges = ((AGENT_NODES + (V2_NODES if cfg_path == CFG_AGENT_V2 else []), AGENT_EDGES + (V2_EDGES if cfg_path == CFG_AGENT_V2 else []))
-                    if kind == "agent" else (RAG_NODES, RAG_EDGES))
-    if not run or not question.strip():
-        graph_slot.graphviz_chart(flow_chart(nodes, edges), width="stretch")
+    if question is None:
+        graph_slot.graphviz_chart(flow_chart(*FLOWS[kind]), width="stretch")
         with log:
             st.info("질문을 넣고 ‘검색하고 답 받기’를 누르면 여기에 단계별 설명이 나타납니다.")
         return
-    env.setup()
     try:
-        with st.spinner("AI가 일하는 중…"):
-            res = (run_agent_live if kind == "agent" else run_rag_live)(cfg_path, question.strip(), scope, graph_slot, log)
+        with st.spinner(f"{mode.split(' · ')[0].lstrip('★ ')} 버전이 일하는 중…"):
+            run_fn = {"rag": run_rag_live, "repair": run_agent_live, "checkout": run_checkout_live}[kind]
+            res = run_fn(cfg_path, question, scope, graph_slot, log)
     except Exception as e:  # show the failure instead of a blank page (missing index, API key, quota)
-        st.error(f"실행하지 못했어요: {e}")
-        st.caption("인덱스가 없으면 `python scripts/build_index.py --config configs/013b-rerank-lite.yaml`, API 키는 `.env`의 GOOGLE_API_KEY를 확인하세요.")
+        area.error(f"실행하지 못했어요: {e}")
+        area.caption(f"인덱스가 없으면 `python scripts/build_index.py --config {cfg_path}`, API 키는 `.env`의 GOOGLE_API_KEY를 확인하세요.")
         return
+    with area:
+        st.divider()
+        st.markdown(f'### 최종 답 {pill(res["status"])}', unsafe_allow_html=True)
+        st.write(res["answer"])
+        st.caption(f"끝난 이유: {res['reason']} · 지나간 칸 {len(res['path']) - 2}개")
+        cost_row(res["steps"], res["searches"], narrow=not wide)
+        if item and question == item["question"].strip():
+            live_grade(item, res)
+        else:
+            st.caption("채점: 골든셋 문항을 그대로 넣었을 때만 기준 답안과 비교해 점수를 매깁니다.")
+        with st.expander("답에 쓴 조각 모두 보기 (초록 = 출처로 쓴 조각)"):
+            show_chunks(res["context"], {c["chunk_id"] for c in res["citations"]})
+
+
+def run_checkout_live(cfg_path: str, question: str, scope: str, graph_slot, log):
+    """Henry's version: the whole run happens in his checkout (app/run_checkout.py), then the path is drawn."""
+    import subprocess
+    if not (HENRY_DIR / "out/index").exists():
+        raise RuntimeError(f"Henry 버전 폴더가 없거나 인덱스가 없습니다. 저장소 폴더에서: git worktree add --detach ../{HENRY_DIR.name} "
+                           f"{HENRY_COMMIT} && ln -s \"$PWD/.env\" ../{HENRY_DIR.name}/.env && cd ../{HENRY_DIR.name} && "
+                           f"python scripts/build_index.py --config {cfg_path}")
+    path = ["start"]
+    graph_slot.graphviz_chart(flow_chart(HENRY_NODES, HENRY_EDGES, path, "start"), width="stretch")
+    done = subprocess.run([sys.executable, str(ROOT / "app/run_checkout.py"), str(HENRY_DIR), cfg_path, scope],
+                          input=question, capture_output=True, text=True, timeout=300)
+    if done.returncode:
+        raise RuntimeError(done.stderr.strip().splitlines()[-1] if done.stderr.strip() else f"exit {done.returncode}")
+    res = json.loads(done.stdout)
+    path += ["search", "generate", "end"]
+    graph_slot.graphviz_chart(flow_chart(HENRY_NODES, HENRY_EDGES, path), width="stretch")
+    with log:
+        box = step_box(1, "조각 5개 찾기")
+        box.write("뜻이 비슷한 조각을 점수 순으로 5개 꺼냈어요. AI가 다시 고르는 칸은 없어요.")
+        with box.expander("5개 조각 보기"):
+            show_chunks(res["context"])
+        box = step_box(2, "답 쓰기 + 출처 붙이기")
+        box.markdown(pill(res["status"]), unsafe_allow_html=True)
+    return {**res, "searches": 1, "reason": "정상적으로 끝났어요", "path": path}
+
+
+# ---------------------------------------------------------------- live page: team comparison notes (bottom)
+STAGE_HELP = {"검색에서 놓침": "정답이 있는 쪽을 하나도 찾지 못했어요.",
+              "검색에서 일부만 찾음": "정답이 여러 쪽에 걸쳐 있는데 그중 일부만 찾았어요.",
+              "AI 고르기에서 버림": "후보 15개 안에는 정답 쪽이 있었는데 AI가 5개를 고르며 뺐어요.",
+              "답 쓰기 (근거는 찾음)": "정답 쪽을 찾아 넘겼는데 답에서 빠뜨리거나 틀리게 썼어요.",
+              "대응 판단 (보류·되묻기·거절)": "문서에 답이 없는 질문인데 보류·되묻기·거절을 제대로 못 했어요."}
+
+
+def unit_pages(u: dict) -> set:
+    return {(normalize("NFC", u["source"]), p) for p in (u.get("pages") or [u["page"]])}
+
+
+def failed_stage(item: dict, context: list, correctness: int, pool: list | None = None) -> str | None:
+    """Where a not-fully-correct answer went wrong, judged by page: retrieval, the AI pick, or the answer step.
+    shortcut: page-level only (a found page can still lack the exact sentence), enough for a breakdown."""
+    if correctness == 2:
+        return None
+    targets = {(normalize("NFC", t["file"]), t["page"]) for t in item.get("targets", [])}
+    if not targets:
+        return "대응 판단 (보류·되묻기·거절)"
+    found = set().union(set(), *map(unit_pages, context))
+    if targets <= found:
+        return "답 쓰기 (근거는 찾음)"
+    if found & targets:
+        return "검색에서 일부만 찾음"
+    if pool and targets & set().union(set(), *map(unit_pages, pool)):
+        return "AI 고르기에서 버림"
+    return "검색에서 놓침"
+
+
+@st.cache_data
+def saved_breakdown(run_dir: str, cfg_path: str | None = None) -> dict:
+    """Stage counts over a saved dev run; cfg_path maps the rerank pool's chunk ids to pages (this repo's index)."""
+    runs, grades = jsonl(f"{run_dir}/runs.jsonl"), {g["qid"]: g["correctness"] for g in jsonl(f"{run_dir}/grades.jsonl")}
+    if not runs:
+        return {}
+    chunks = ({u["chunk_id"]: u for s in "AB" for u in jsonl(str(index_dir(cfg_of(cfg_path), s) / "chunks.jsonl"))}
+              if cfg_path else {})
+    gold = {i["qid"]: i for i in load_golden()}
+    stages = Counter()
+    for r in runs:
+        pool = [chunks[c] for c in (r["steps"].get("rerank") or {}).get("pool", []) if c in chunks]
+        stages[failed_stage(gold[r["qid"]], r["context"], grades[r["qid"]], pool) or "정답"] += 1
+    return {"n": len(runs), "stages": stages, "calls": sum(r["n_llm_calls"] for r in runs) / len(runs)}
+
+
+def team_notes():
     st.divider()
-    st.markdown(f'### 최종 답 {pill(res["status"])}', unsafe_allow_html=True)
-    st.write(res["answer"])
-    st.caption(f"끝난 이유: {res['reason']} · 지나간 칸 {len(res['path']) - 2}개")
-    cost_row(res["steps"], res["searches"])
-    with st.expander("답에 쓴 조각 모두 보기 (초록 = 출처로 쓴 조각)"):
-        show_chunks(res["context"], {c["chunk_id"] for c in res["citations"]})
+    st.header("👥 팀원 버전 한눈에 비교")
+    t4 = saved_breakdown(str(RESULTS / "dev_013b_rerank_lite_fix"), CFG_LITE)
+    t3 = saved_breakdown(str(RESULTS / "dev_008b_agent950"))
+    t2 = saved_breakdown(str(RESULTS / "dev_013_rerank_flash36_fix"), CFG_LITE)  # same index as T4
+    hy = saved_breakdown(str(HENRY_DIR / "results/dev_011_lite31_prompt2"))
+    henry_score = (summary_of_path(str(HENRY_DIR / "results/dev_011_lite31_prompt2/summary.json")) or {}).get("scores", {}).get("correctness_mean")
+    henry_usd = (summary_of_path(str(HENRY_DIR / "results/dev_011_lite31_prompt2/summary.json")) or {}).get("cost", {}).get("usd_per_question")
+    fmt = lambda v, f="{:.3f}": f.format(v) if v is not None else "-"
+    st.markdown("#### 1. 무엇이 다른가")
+    rows = [
+        ("조각 자르기", "용어 1개·약관 조항 1개를 한 조각(1,600자 넘는 조항만 항 앞에서 자름), 나머지 문서는 950자씩·119자 겹침",
+         "Serin-91과 같음", "용어 1개·약관 조항 1개를 한 조각(800자 넘으면 다시 자름), 나머지 문서는 쪽마다 800자씩·100자 겹침"),
+        ("조각 수 · 길이 (23개 문서)", "1,426개 · 중간 410자 · 가장 긴 것 2,979자", "Serin-91과 같은 인덱스", "1,605개 · 중간 407자 · 가장 긴 것 799자"),
+        ("찾기", "뜻 검색 + 단어 검색 반반으로 후보 15개 → AI가 5개 고르기", "Serin-91과 같음 + 부족하면 검색어 바꿔 다시 찾기(최대 2번)", "뜻 검색만, 점수 순 5개"),
+        ("판단 칸", "없음", "질문 종류 판단 · 근거 진단(잘림·못 찾음·깨짐) · 잘린 조각을 페이지 전체로 넓히기 · 출처 확인", "없음"),
+        ("답하는 AI · 답변 규칙", "gemini-3.5-flash-lite · v4", "gemini-3.6-flash (큰 AI) · v4", "gemini-3.1-flash-lite · Henry의 v2"),
+        ("질문당 AI 호출 (연습 90 평균)", f"{t4.get('calls', 0):.1f}번", "4~5번 (동작 확인 3문항, 바탕인 T3는 4.1번)", f"{hy.get('calls', 0):.1f}번" if hy else "-"),
+        ("질문당 비용 (연습 90 평균)", f"{summary_of('dev_013b_rerank_lite_fix')['cost']['usd_per_question']:.4f}달러",
+         "0.006~0.016달러 (동작 확인 3문항)", fmt(henry_usd, "{:.4f}달러")),
+        ("정확도 (연습 90, 0~1)", fmt(score("dev_013b_rerank_lite_fix")), "없음 (사전 점검 기준 미달로 전체 실행 안 함)", fmt(henry_score)),
+    ]
+    st.dataframe(pd.DataFrame(rows, columns=["항목", "Serin-91 · T4 최종", "LimDaeJin · 카드 015", "Henry · 카드 011"]), hide_index=True, width="stretch")
+
+    st.markdown("#### 2. 틀린 문항은 어느 단계에서 막혔나 (연습 90문항, 저장된 결과)")
+    st.caption("정답 쪽을 찾았는지는 쪽 단위로 봤습니다. LimDaeJin 버전은 전체 결과가 없어, 그 바탕인 T3 Agent(같은 찾기 + 다시 찾기, 큰 AI)의 결과를 참고로 넣었습니다.")
+    order = ["정답"] + list(STAGE_HELP)
+    table = pd.DataFrame({"단계": order,
+                          "Serin-91 · T4": [t4["stages"].get(k, 0) for k in order] if t4 else "-",
+                          "(참고) T3 Agent · 015의 바탕": [t3["stages"].get(k, 0) for k in order] if t3 else "-",
+                          "Henry · 카드 011": [hy["stages"].get(k, 0) for k in order] if hy else "-",
+                          "뜻": ["채점 2점"] + list(STAGE_HELP.values())})
+    st.dataframe(table, hide_index=True, width="stretch")
+
+    if not (t4 and t3 and t2 and hy):
+        return
+    miss = lambda b: sum(b["stages"].get(k, 0) for k in ("검색에서 놓침", "검색에서 일부만 찾음", "AI 고르기에서 버림"))
+    wrong = lambda b: b["n"] - b["stages"].get("정답", 0)
+    ans = lambda b: b["stages"].get("답 쓰기 (근거는 찾음)", 0)
+    t2_score, t3_score = score("dev_013_rerank_flash36_fix"), score("dev_008b_agent950")
+    t2_usd, t3_usd = (summary_of(e)["cost"]["usd_per_question"] for e in ("dev_013_rerank_flash36_fix", "dev_008b_agent950"))
+    st.markdown("#### 3. 왜 AI를 더 부르거나 칸을 더 늘릴 필요가 없나")
+    st.markdown(f"""
+- **틀린 곳은 '찾기'가 아니라 '답 쓰기'였습니다.** T4가 틀린 {wrong(t4)}문항 중 찾기에서 막힌 것은 **{miss(t4)}문항**뿐이고,
+  {t4['stages'].get('답 쓰기 (근거는 찾음)', 0)}문항은 정답 쪽을 찾아 넘겼는데 답에서 빠뜨렸습니다.
+  Agent의 '다시 찾기'와 카드 015의 '잘린 조각 넓히기'는 **찾기 문제를 고치는 장치**라, 고칠 대상이 처음부터 거의 없었습니다.
+  실제로 T3는 90문항 중 3문항에서만 다시 찾았고, 카드 015의 사전 점검에서도 넓혀서 나아질 문항이 2개뿐이었습니다(기준 3개).
+- **효과가 있던 추가 호출은 'AI가 5개 고르기' 한 번입니다.** 뜻 검색으로 5개만 바로 넘기는 Henry 버전(질문당 {hy['calls']:.0f}번 호출)은
+  찾기에서 막힌 문항이 **{miss(hy)}문항**, 단어 검색을 섞고 AI가 15개 중 5개를 고르는 T4({t4['calls']:.0f}번 호출)는 **{miss(t4)}문항**입니다.
+  조각 자르기와 답변 규칙도 달라서 이 차이가 전부 이 한 칸 덕은 아니지만, 이 칸 하나를 더한 실험에서 정답률이 가장 크게 올랐습니다(0.883 → 0.928).
+- **남은 차이는 칸 수가 아니라 답 쓰는 AI의 크기입니다.** 같은 3칸에 큰 AI를 쓴 T2는 {t2_score:.3f}, 판단 칸을 더한 T3는 {t3_score:.3f}입니다.
+  차이({t3_score - t2_score:.3f})는 같은 설정을 다시 돌릴 때 생기는 흔들림(±0.03) 안인데, 비용은 {t3_usd / t2_usd:.1f}배({t2_usd:.4f} → {t3_usd:.4f}달러)이고
+  AI 호출은 2번에서 {t3['calls']:.1f}번으로 늘었습니다. '답 쓰기'에서 틀린 문항은 작은 AI T4 {ans(t4)}개 → 큰 AI T2 {ans(t2)}개 → 판단 칸을 더한 T3 {ans(t3)}개로,
+  줄어든 몫의 대부분은 AI 크기에서 나옵니다(찾기에서 막힌 문항은 셋 다 {miss(t4)}개로 같음).
+- **그래서 최종은 칸 3개, AI 호출 2번입니다.** 작은 AI로 바꾼 T4는 {score('dev_013b_rerank_lite_fix'):.3f}로 T2보다 조금 낮지만
+  비용이 {summary_of('dev_013b_rerank_lite_fix')['cost']['usd_per_question'] / t2_usd:.0%} 수준입니다. 더 올리려면 칸을 늘리기보다 답 쓰기(빠뜨림)를 고치는 쪽이 맞습니다.
+""")
+
+
+def page_live():
+    st.title("💬 직접 검색해서 써보기")
+    st.write("궁금한 금융 질문을 넣거나 골든셋 문항을 골라 보세요. 팀원마다 만든 버전이 **어떤 칸을 어떤 순서로 지나가는지** 그림에 실시간으로 표시되고, "
+             "칸마다 무엇을 판단했는지가 쉬운 말로 쌓입니다. **세 버전 나란히**를 고르면 같은 질문에 팀원 세 명의 버전이 어떻게 다르게 답하는지 한 화면에서 비교할 수 있습니다.")
+    st.caption("실제로 AI를 부릅니다. 질문 하나에 버전마다 약 0.004~0.02달러(5~25원) 듭니다(나란히 보면 세 번). 골든셋 문항은 답마다 채점용 AI를 한 번 더 부릅니다. 같은 질문도 매번 조금씩 다르게 흘러갈 수 있습니다.")
+    gold = load_golden()
+    by_qid = {i["qid"]: i for i in gold}
+    groups = {"예시 질문": [by_qid[q] for q, _ in EXAMPLES]} | {g: [i for i in gold if keep(i)] for g, keep in GOLDEN_GROUPS.items()}
+    labels = {q: label for q, label in EXAMPLES}
+    c1, c2 = st.columns([2, 3])
+    with c1:
+        source = st.selectbox("질문 고르기", list(groups) + ["직접 입력"])
+    with c2:
+        items = groups.get(source, [])
+        qid = st.selectbox("문항", [i["qid"] for i in items], disabled=not items,
+                           format_func=lambda q: f"{q} · {labels.get(q) or by_qid[q]['question'][:45]}")
+    item = by_qid.get(qid) if items else None
+    question = st.text_area("질문", value=item["question"] if item else "", height=90,
+                            placeholder="예: 휴면성 증권계좌는 어떤 계좌인가요?  /  주택연금은 몇 살부터 가입할 수 있나요?")
+    view = st.radio("어느 버전으로 답할까요?", ["⇄ 세 버전 나란히 비교"] + list(SYSTEMS), index=0,
+                    help="Serin-91 버전은 제출한 최종 시스템(T4)입니다. LimDaeJin 버전은 근거가 부족한 이유를 진단해 잘린 조각을 페이지 전체로 넓히는 Agent, "
+                         "Henry 버전은 구조 단위로 자른 조각 5개를 뜻 검색으로 찾아 작은 AI(gemini-3.1-flash-lite)가 답하는 기본 RAG입니다.")
+    default_scope = scope_of(item, cfg_of(CFG_LITE)) if item else "B"
+    scope = st.radio("찾을 문서", ["B", "A"], index=0 if default_scope == "B" else 1, horizontal=True,
+                     format_func=lambda s: "전체 23개 문서" if s == "B" else "용어집·약관만 (기본 문제 세트의 조건)")
     if item:
-        with st.expander("정답과 비교해 보기"):
+        with st.expander("이 문항의 정답 (골든셋)", expanded=False):
             st.write("**기준 답안**", item["target_answer"])
-            st.write("**꼭 들어가야 할 내용**", ", ".join(item["must_include"]) or "-")
+            st.write("**꼭 들어가야 할 내용**", ", ".join(item.get("must_include") or []) or "-")
             st.write("**정답이 있는 쪽**", [f"{t['file']} p.{t['page']}" for t in item["targets"]] or "문서에 없는 질문 (보류·되묻기·거절이 정답)")
+    st.markdown(LEGEND, unsafe_allow_html=True)
+    run = st.button("▶ 검색하고 답 받기", type="primary")
+    q = question.strip() if run and question.strip() else None
+    if q:
+        env.setup()
+    if view in SYSTEMS:
+        live_run(view, q, scope, st.container(), wide=True, item=item)
+    else:
+        st.markdown("<style>.block-container {max-width: 100%; padding-left: 2rem; padding-right: 2rem;}</style>", unsafe_allow_html=True)
+        for mode, col in zip(SYSTEMS, st.columns(len(SYSTEMS), gap="medium")):
+            col.markdown(f"### {mode}")
+            live_run(mode, q, scope, col, wide=False, item=item)
+    team_notes()
 
 
 # ---------------------------------------------------------------- 3. history
