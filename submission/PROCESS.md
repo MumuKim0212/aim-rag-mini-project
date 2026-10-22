@@ -23,6 +23,7 @@ GUIDE: 진행 과정 기록. docs/WORKFLOW.md의 단계 순서대로, 무엇을 
 | 페이지 추출·진단 → `corpus/pages.jsonl` (텍스트 레이어 + 범위 B VLM 보충, 1.2절) | 1 | | 완료 | Henry | 2026-10-20 |
 | 제공 세트 변환 (정답 ID → 파일·페이지, 근거 구절, dev/test 분할) → `golden/provided.jsonl` (2절) | 1 | | 완료 | Henry | 2026-10-20 |
 | 자작 골든셋 `golden/self2.jsonl` 41문항 작성·자동 대조 (첫 20문항 초안은 만점이라 폐기, 2.5절·`golden/review_log.md`) | 1 | Serin-91 | 완료 | serin-91/chunking-cards-001-002 | 2026-10-22 |
+| 보완용 자작 골든셋 `golden/self_v2.jsonl` 28문항(세트 `self3`, 평가 안 함): `self2`와 문서가 거의 겹치지 않는 추가 세트. 자동 대조·이미지 대조 완료, 사람 검수 대기 | 1 | henry | 검토 중 | henry-golden-self-v2 | 2026-10-22 |
 | 채점 프롬프트 고정 (`prompts/judge_v1.md`, `judge.grade`, 2.4절) | 1 | henry | 완료 | Henry | 2026-10-21 |
 | 기본 RAG 구현 (추출·Recursive 청킹·벡터 검색·BaselineRAG) | 2 | | 완료 | | 2026-10-20 |
 | `prompts/answer_v1.md` 검토·고정 (기본 RAG 첫 실행 전) | 2 | henry | 완료 | Henry | 2026-10-21 |
@@ -121,7 +122,7 @@ _발견한 추출 문제(이미지에만 있는 정보, 깨진 표 등)와 처�
 
 #### 2.1 구성
 
-`golden/provided.jsonl` (2026-10-20, 시드 20261020, `python scripts/convert_golden.py`). 자작 골든셋은 2.5절.
+`golden/provided.jsonl` (2026-10-20, 시드 20261020, `python scripts/convert_golden.py`). 자작 골든셋은 2.5절. 보완용 `golden/self_v2.jsonl`(28문항, 세트 `self3`)은 아직 어떤 시스템에도 돌리지 않았고 `GOLDEN_FILES`에도 등록하지 않았다(`golden/review_log.md`).
 
 | 출처 | 답변 가능 | dev | test |
 |---|---|---|---|
