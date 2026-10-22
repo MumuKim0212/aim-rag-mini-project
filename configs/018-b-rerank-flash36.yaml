@@ -1,0 +1,8 @@
+base: 017b-flash38.yaml
+name: 018_b_rerank_flash36
+card: experiments/018-rerank-model.md
+compare_to: test_017b_flash38
+description: "B (answer gemini-3.8-flash, thinking low) with the rerank by gemini-3.6-flash, thinking low instead of gemini-3.5-flash-lite (card 018)"
+retrieval:
+  rerank_model: gemini-3.6-flash
+  rerank_thinking_level: low
