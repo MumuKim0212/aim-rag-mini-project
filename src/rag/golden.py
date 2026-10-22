@@ -74,8 +74,12 @@ def load_golden(split: str | None = None, sets=None, files=None, golden_dir: Pat
     return items
 
 
+# sets added after baseline.yaml was frozen (editing it would change every index key)
+EXTRA_SCOPE = {"self2": "B"}
+
+
 def scope_of(item: dict, cfg: dict) -> str:
-    return cfg["corpus"]["set_scope"][item["set"]]
+    return {**EXTRA_SCOPE, **cfg["corpus"]["set_scope"]}[item["set"]]
 
 
 def behavior_of(item: dict) -> tuple[str, set[str]]:
