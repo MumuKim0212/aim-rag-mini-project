@@ -36,23 +36,24 @@ st.markdown("""
 <style>
 .block-container {max-width: 1180px; padding-top: 2rem;}
 h1 {font-weight: 800; letter-spacing: -0.5px;}
-.hero {background: linear-gradient(135deg,#eef2ff 0%,#e0f2fe 100%); border-radius: 18px; padding: 28px 32px; margin-bottom: 18px;}
-.hero h2 {margin: 0 0 6px 0; font-size: 1.6rem;}
+.hero {background: linear-gradient(135deg,#eef2ff 0%,#e0f2fe 100%); border-radius: 18px; padding: 28px 32px; margin-bottom: 18px; color:#0f172a;}
+.hero h2 {margin: 0 0 6px 0; font-size: 1.6rem; color:#0f172a;}
 .hero p {margin: 0; font-size: 1.05rem; color: #334155;}
-.card {border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 18px; background: #ffffff; height: 100%;}
-.card h4 {margin: 0 0 6px 0;}
+.card {border: 1px solid #cbd5e1; border-radius: 14px; padding: 16px 18px; background: #f8fafc; height: 100%; color:#0f172a;}
+.card h4 {margin: 0 0 6px 0; color:#0f172a;}
 .card p {margin: 0; color: #475569; font-size: 0.95rem;}
 .step {display:inline-block; width: 28px; height: 28px; line-height: 28px; text-align:center; border-radius: 50%;
        background:#4f46e5; color:#fff; font-weight:700; margin-right:8px;}
 .pill {display:inline-block; padding: 3px 12px; border-radius: 999px; font-weight:700; font-size:0.9rem;}
 .p-ok {background:#dcfce7; color:#166534;} .p-hold {background:#fef3c7; color:#92400e;}
 .p-ask {background:#dbeafe; color:#1e40af;} .p-no {background:#fee2e2; color:#991b1b;}
-.chunk {border-left: 5px solid #94a3b8; background:#f8fafc; border-radius: 8px; padding: 8px 12px; margin: 6px 0; font-size: 0.9rem;}
-.chunk.picked {border-left-color:#16a34a; background:#f0fdf4;}
-.chunk .tag {font-size:0.78rem; color:#64748b;}
+.chunk {border-left: 5px solid #94a3b8; background:#f1f5f9; border-radius: 8px; padding: 8px 12px; margin: 6px 0; font-size: 0.9rem; color:#0f172a;}
+.chunk.picked {border-left-color:#16a34a; background:#dcfce7; color:#0f172a;}
+.chunk .tag {font-size:0.78rem; color:#475569;}
 .big {font-size: 2.1rem; font-weight: 800; line-height: 1.1;}
 .sub {color:#64748b; font-size:0.9rem;}
 .note {background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 14px; color:#78350f;}
+.note b {color:#78350f;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -136,17 +137,17 @@ def page_overview():
 # ---------------------------------------------------------------- 1. flow
 PIPELINE = """
 digraph G {
-  graph [rankdir=LR, fontname="Helvetica", fontsize=16, nodesep=0.35, ranksep=0.5, pad=0.3];
-  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=15, margin="0.2,0.12", color="#cbd5e1"];
-  edge [color="#64748b", penwidth=1.6, arrowsize=0.9];
-  subgraph cluster_prep { label="① 준비 (한 번만 합니다)"; style="rounded,dashed"; color="#94a3b8"; fontsize=17;
+  graph [rankdir=LR, fontname="Helvetica", fontsize=16, fontcolor="#64748b", nodesep=0.35, ranksep=0.5, pad=0.3];
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontcolor="#0f172a", fontsize=15, margin="0.2,0.12", color="#94a3b8"];
+  edge [color="#94a3b8", penwidth=1.6, arrowsize=0.9];
+  subgraph cluster_prep { label="① 준비 (한 번만 합니다)"; style="rounded,dashed"; color="#94a3b8"; fontcolor="#94a3b8"; fontsize=17;
     pdf [label="PDF 23개", fillcolor="#e0e7ff"];
     ext [label="쪽별 글자 추출\\n표·그래프는 AI가 글로 풀이", fillcolor="#e0e7ff"];
     chunk [label="조각으로 자르기\\n용어집=용어 하나\\n약관=조 하나\\n나머지=950자", fillcolor="#e0e7ff"];
     emb [label="뜻을 숫자로 바꾸기\\n(임베딩)", fillcolor="#e0e7ff"];
     store [label="저장소\\n벡터 + 단어 색인", fillcolor="#fde68a"];
     pdf -> ext -> chunk -> emb -> store; }
-  subgraph cluster_ask { label="② 질문이 들어오면"; style="rounded,dashed"; color="#94a3b8"; fontsize=17;
+  subgraph cluster_ask { label="② 질문이 들어오면"; style="rounded,dashed"; color="#94a3b8"; fontcolor="#94a3b8"; fontsize=17;
     q [label="질문", shape=oval, fillcolor="#bbf7d0"];
     hy [label="후보 15개 찾기\\n(뜻 비슷 + 단어 일치)", fillcolor="#bfdbfe"];
     rr [label="AI가 5개 고르기\\n(rerank)", fillcolor="#fcd34d"];
@@ -160,8 +161,8 @@ digraph G {
 AGENT = """
 digraph A {
   graph [rankdir=TB, fontname="Helvetica", pad=0.3, nodesep=0.4, ranksep=0.45];
-  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=15, margin="0.2,0.12", color="#cbd5e1", fillcolor="#e0e7ff"];
-  edge [color="#64748b", penwidth=1.5, fontname="Helvetica", fontsize=13];
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontcolor="#0f172a", fontsize=15, margin="0.2,0.12", color="#94a3b8", fillcolor="#e0e7ff"];
+  edge [color="#94a3b8", penwidth=1.5, fontname="Helvetica", fontsize=13, fontcolor="#94a3b8"];
   s [label="질문", shape=oval, fillcolor="#bbf7d0"]; e [label="끝", shape=oval, fillcolor="#bbf7d0"];
   classify [label="질문 종류 판단\\n(문서 질문? 되물어야? 부적절?)"];
   retrieve [label="찾기 (rerank 포함)"]; grade [label="찾은 근거로 답할 수 있나?", fillcolor="#fde68a"];
