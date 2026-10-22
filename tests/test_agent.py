@@ -4,7 +4,7 @@ import pytest
 
 from rag import agent as agent_mod
 from rag import llm
-from rag.agent import Agent, ClassifyOut, GradeOut, RewriteOut
+from rag.agent import Agent, CheckOut, ClassifyOut, GradeOut, RewriteOut
 from rag.config import BASELINE, load_config
 from rag.rag import AnswerOut
 
@@ -16,18 +16,21 @@ def unit(i, page=1):
 class Script:
     """Fake llm.generate_json: answers by schema from queues, records every call like the real one."""
 
-    def __init__(self, classify="document", grades=(True,), answers=None):
-        self.classify, self.grades = classify, list(grades)
+    def __init__(self, classify="document", grades=(True,), answers=None, checks=()):
+        self.classify, self.grades, self.checks = classify, list(grades), list(checks)
         self.answers = list(answers or [AnswerOut(status="answered", answer="답 [1]", citations=[1])])
-        self.nodes = []
+        self.nodes, self.users = [], []
 
     def __call__(self, *, model, system, user, schema, temperature, thinking_level, steps, node, retries=2, timeout_s=None):
         self.nodes.append(node)
+        self.users.append(user)
         llm.record_call(steps, node=node, model=model, input_tokens=10, output_tokens=5)
         if schema is ClassifyOut:
             return ClassifyOut(type=self.classify, reason="r")
         if schema is GradeOut:
             return GradeOut(sufficient=self.grades.pop(0), missing="용어 정의")
+        if schema is CheckOut:
+            return self.checks.pop(0)
         if schema is RewriteOut:
             return RewriteOut(query=f"새 검색어 {self.nodes.count('rewrite')}")
         return self.answers.pop(0)
@@ -99,3 +102,70 @@ def test_invalid_citation_gets_one_retry_only(cfg, monkeypatch):
     ag, _ = make(cfg, monkeypatch, script, [[unit(1)]])
     out = ag.run("질문?", "A")
     assert script.nodes.count("generate") == 2 and out["citations"][0]["chunk_id"] == "c1" and "invalid_citations" not in out["steps"]
+
+
+# ---- card 014: agent v2 (memo + check)
+@pytest.fixture
+def cfg2(cfg):
+    cfg["answer"]["prompt"] = "prompts/answer_v5.md"
+    cfg["agent"].update(memo=True, check=True, max_revise=1)
+    return cfg
+
+
+def generate_users(script):
+    return [u for n, u in zip(script.nodes, script.users) if n == "generate"]
+
+
+def test_v2_check_ok_ends_and_memo_carries_question_type(cfg2, monkeypatch):
+    script = Script(classify="needs_info", checks=[CheckOut(ok=True, problems=[])],
+                    answers=[AnswerOut(status="clarify", answer="경우별로 [1]", citations=[1])])
+    ag, _ = make(cfg2, monkeypatch, script, [[unit(1)]])
+    out = ag.run("제 계좌는요?", "A")
+    assert script.nodes == ["classify", "generate", "check"]
+    assert "needs_info" in generate_users(script)[0] and "{memo}" not in generate_users(script)[0]
+    assert out["steps"]["termination_reason"] == "completed" and out["n_llm_calls"] == 3
+
+
+def test_v2_check_problems_revise_once_and_revision_is_not_checked(cfg2, monkeypatch):
+    first = AnswerOut(status="answered", answer="초안 [1]", citations=[1])
+    second = AnswerOut(status="answered", answer="고친 답 [1]", citations=[1])
+    script = Script(checks=[CheckOut(ok=False, problems=["계산 누락 [1]"])], answers=[first, second])
+    ag, _ = make(cfg2, monkeypatch, script, [[unit(1)]])
+    out = ag.run("질문?", "A")
+    assert script.nodes == ["classify", "grade", "generate", "check", "generate"]
+    revision = generate_users(script)[1]
+    assert "계산 누락 [1]" in revision and "초안 [1]" in revision
+    assert out["answer"].startswith("고친 답") and out["steps"]["termination_reason"] == "revised"
+
+
+def test_v2_ok_false_without_problems_counts_as_ok(cfg2, monkeypatch):
+    script = Script(checks=[CheckOut(ok=False, problems=[" "])])
+    ag, _ = make(cfg2, monkeypatch, script, [[unit(1)]])
+    out = ag.run("질문?", "A")
+    assert script.nodes.count("generate") == 1 and out["steps"]["termination_reason"] == "completed"
+
+
+def test_v2_still_insufficient_after_last_search_is_in_memo_and_reason(cfg2, monkeypatch):
+    script = Script(grades=(False, False, False), checks=[CheckOut(ok=True, problems=[])],
+                    answers=[AnswerOut(status="answered", answer="일부만 [1]", citations=[1])])
+    ag, _ = make(cfg2, monkeypatch, script, [[unit(1)], [unit(2)], [unit(3)]])
+    out = ag.run("질문?", "A")
+    assert "근거 부족: 검색 3번" in generate_users(script)[0]
+    assert out["steps"]["termination_reason"] == "insufficient_evidence"
+
+
+def test_v2_config_errors(cfg2):
+    cfg2["answer"]["prompt"] = "prompts/answer_v4.md"
+    with pytest.raises(ValueError, match="memo"):
+        Agent(cfg2)
+    cfg2["answer"]["prompt"] = "prompts/answer_v5.md"
+    cfg2["agent"]["memo"] = False
+    with pytest.raises(ValueError, match="check needs"):
+        Agent(cfg2)
+
+
+def test_v1_config_has_no_check_node_and_no_memo(cfg, monkeypatch):
+    script = Script()
+    ag, _ = make(cfg, monkeypatch, script, [[unit(1)]])
+    ag.run("질문?", "A")
+    assert "check" not in ag.graph.get_graph().nodes and "에이전트 메모" not in generate_users(script)[0]

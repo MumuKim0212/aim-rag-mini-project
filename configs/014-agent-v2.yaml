@@ -1,0 +1,13 @@
+base: 008b-agent-950.yaml
+name: 014_agent_v2
+card: experiments/014-agent-v2.md
+compare_to: dev_013_rerank_flash36_fix
+description: "Agent v2 on the final chain: T3 graph + memo to generate (question type, missing evidence; answer prompt v5) + check node (gemini-3.8-flash) with at most one revision (card 014)"
+answer:
+  prompt: prompts/answer_v5.md
+agent:
+  memo: true
+  check: true
+  max_revise: 1
+  node_models:
+    check: gemini-3.8-flash       # a different model from the answer model reviews the draft (course 17: self-review bias); same price

@@ -33,10 +33,14 @@ def render_context(units: list[dict]) -> str:
     return "\n\n".join(f"[{i}] ({u['source']}, {page_label(u)})\n{u['content']}" for i, u in enumerate(units, 1))
 
 
-def generate_answer(question: str, units: list[dict], cfg: dict, steps: dict, node: str = "generate") -> AnswerOut:
+def generate_answer(question: str, units: list[dict], cfg: dict, steps: dict, node: str = "generate",
+                    memo: str | None = None) -> AnswerOut:
     a = cfg["answer"]
     prompt = load_prompt(a["prompt"])
-    user = fill(prompt["user"], question=question, context=render_context(units) or "(없음)")
+    values = {"question": question, "context": render_context(units) or "(없음)"}
+    if memo is not None:  # agent v2 only (answer_v5 {memo}); None keeps the v1-v4 rendering byte for byte
+        values["memo"] = memo
+    user = fill(prompt["user"], **values)
     return llm.generate_json(model=a["model"], system=prompt["system"], user=user, schema=AnswerOut,
                              temperature=a.get("temperature"), thinking_level=a.get("thinking_level"),
                              steps=steps, node=node, retries=cfg["run"]["max_retries"],

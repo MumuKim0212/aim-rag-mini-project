@@ -77,3 +77,46 @@ graph TD;
 - **누적 문맥 상한 10개**를 추가했다(첫 검색 5 + 새 청크 최대 5). 재검색을 두 번 해도 답변 입력이 3배로 늘지 않게 하기 위해서다.
 - 노드 구성을 바꾼 근거는 실패 분석(PROCESS.md 6절)의 "근거 부족" 25문항(검색 실패 7, 근거 일부 누락 13, 과잉 보류 5)을 재검색 노드가 겨냥하고, negative 6문항(NEG014 NEG025 NEG037 NEG039 NEG022 NEG023)은 공통 답변 단계가 다룬다는 판단이다.
 - dev 결과(카드 008): 점수 0.822 → 0.856, 순승 +3으로 오차 범위. 재검색은 9문항, 그중 3문항이 재검색으로만 찾은 청크를 인용했다.
+
+## 7. 시도했지만 채택하지 않은 판: Agent v2 (카드 014, 2026-10-22)
+
+최종 체인에서는 검색이 거의 다 맞고(dev page_hit@5 0.99), 틀리는 이유는 찾은 근거를 답에서 빠뜨리는 것이었다(T2 dev 만점 아닌 12문항 중 10문항). 그래서 v1 그래프 끝에 답변 검사 노드를 붙이고, v1이 버리던 분류 결과를 답변 단계에 넘겼다. 설정 `configs/014-agent-v2.yaml`, 모두 설정으로 켜고 끄므로 T3 설정은 그대로 재현된다.
+
+```mermaid
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	classify(classify)
+	retrieve(retrieve)
+	grade(grade)
+	rewrite(rewrite)
+	generate(generate)
+	cite_check(cite_check)
+	check(check)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> classify;
+	check -. &nbsp;end&nbsp; .-> __end__;
+	check -.-> generate;
+	cite_check -. &nbsp;end&nbsp; .-> __end__;
+	cite_check -.-> check;
+	cite_check -.-> generate;
+	classify --> retrieve;
+	generate --> cite_check;
+	grade -.-> generate;
+	grade -.-> rewrite;
+	retrieve --> grade;
+	rewrite --> retrieve;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+```
+
+| 바뀐 것 | 내용 |
+|---|---|
+| generate에 메모 전달 | classify의 질문 유형·이유, 마지막 grade가 부족이면 "근거 부족: 검색 N번 뒤에도 부족 - 무엇이". 답변 프롬프트 `answer_v5` = v4 + 규칙 12(메모는 참고, status는 규칙 5로 직접 정함) |
+| check 노드 (`agent_check_v1.md`, `gemini-3.8-flash`) | cite_check를 통과한 초안을 읽고 빠진 부분·빠진 단서·결과에 없는 숫자·대응 방식 오류를 찾는다. 지적이 있으면 generate가 지적과 초안을 메모로 받아 1번 고쳐 쓴다. 고쳐 쓴 답은 다시 검사하지 않는다 |
+| 종료 이유 | `steps.termination_reason` = completed / revised / insufficient_evidence |
+| 만들지 않은 것 | 고정 문구 보류 노드(수업 23번): v1 dev에서 근거 부족으로 끝난 4문항 중 ADD-HF06(부분 근거로 만점)과 NEG034(올바른 거절)를 잃게 되어, 부족 상태는 메모로만 넘겼다 |
+
+종료 조건: 재검색 최대 2회(검색 3회), 인용 재시도 최대 1회, 고쳐 쓰기 최대 1회. 최악의 경우 LLM 호출 = classify 1 + rerank 3 + grade 3 + rewrite 2 + generate 4 + check 1.
+
+결과: dev 90에서 0.928로 T2와 같았다(2 / 2 / 86). check가 지적한 것은 3문항뿐이고 겨냥한 10문항은 하나도 지적하지 않았다. 자작 41문항에서는 고쳐 쓴 문항이 0이었다. 비용은 T2의 1.5배라 채택하지 않았다. 자세한 수치는 [카드 014](../experiments/014-agent-v2.md).
