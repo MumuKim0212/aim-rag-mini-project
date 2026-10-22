@@ -1,7 +1,7 @@
 """Golden items, index scope per set, and the system status each expected behavior allows.
 
-Files: golden/provided.jsonl (converted provided set, dev + test) and golden/self.jsonl (self-written,
-split "test"). Item format: golden/README.md ("This project").
+Files: golden/provided.jsonl (converted provided set, dev + test) and golden/self2.jsonl (self-written,
+split "test"; golden/self.jsonl is the archived first draft, kept so old results still resolve). Item format: golden/README.md ("This project").
 
 BEHAVIORS maps the provided `expected_behavior` values to a reporting group and the `status` values
 (prompts/answer_v1.md) that count as the right response. Some behaviors allow two statuses because the
@@ -16,8 +16,8 @@ from pathlib import Path
 from . import ROOT
 
 GOLDEN_DIR = ROOT / "golden"
-GOLDEN_FILES = ("provided.jsonl", "self.jsonl")
-SETS = ("base_positive", "base_negative", "life_guide", "additional", "self")
+GOLDEN_FILES = ("provided.jsonl", "self.jsonl", "self2.jsonl")
+SETS = ("base_positive", "base_negative", "life_guide", "additional", "self", "self2")
 STATUSES = ("answered", "abstained", "clarify", "refused")
 
 A, AB, C, R = {"answered"}, {"abstained"}, {"clarify"}, {"refused"}

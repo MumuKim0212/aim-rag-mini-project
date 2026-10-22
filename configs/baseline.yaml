@@ -46,7 +46,8 @@ corpus:
     base_negative: A
     life_guide: B
     additional: B
-    self: B
+    self: B                     # archived: golden/self.jsonl, replaced by self2 (see golden/README.md)
+    self2: B
 
 chunking:
   method: recursive             # recursive | structure

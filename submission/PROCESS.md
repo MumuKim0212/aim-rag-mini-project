@@ -277,6 +277,19 @@ test 실행 전에 아래 표를 채우고 커밋한다. 이후 바꾸지 않는
 | T3 Agent | `configs/008b-agent-950.yaml` | `test_008b_agent950` | T2 대비: 그래프만 (classify·grade·rewrite+재검색·cite_check). 노드 모델은 모두 답변 모델 `gemini-3.6-flash`로 같음. 검색 노드는 T2와 같은 rerank를 거친다(2026-10-22 코드 변경, Agent는 새 설정으로 dev에서 돌려 보지 않았다) | `d8efc09` |
 
 - 최종 시스템(dev 기준으로 미리 정함): **T2** (dev 0.928). 이유: Agent는 카드 008에서 기준 미달(점수 0.856 vs 0.822, 순승 +3, 비용 약 2배)이었고, 새 설정(rerank·v4)에서는 dev를 돌려 보지 않았다. T3는 구조 효과를 재려고 test에서 한 번 돌릴 뿐 최종 후보가 아니다. 설정 파일 상태 커밋 = 표의 커밋 열.
+- 2차 최종 test (2026-10-22, 첫 실행 결과를 본 뒤 정한 것이라 따로 적는다. 아래 표를 채우고 커밋한 뒤 실행한다)
+  - 이유 1: 사용자가 **가격** 때문에 최종 시스템을 작은 모델로 바꾸기로 했다(문항당 약 0.0035 USD vs 0.0086~0.0091 USD). 선택 근거는 dev(0.894)와 가격이고 test 점수가 아니다. 그래도 최종 시스템의 test 수치가 있어야 해서 T4를 test에서 한 번 돌린다. 제공 test 90문항을 두 번째로 쓰는 것이므로 EVALUATION.md에 그대로 밝힌다.
+  - 이유 2: 첫 자작 골든셋(`golden/self.jsonl`, 20문항)은 T2가 정답 점수 1.0을 받아 시스템을 구분하지 못했다(너무 쉬움). 폐기하고 `golden/self2.jsonl` 41문항(답변 가능 32, 불가·되묻기·거절 9)으로 다시 만들었다. 이 세트는 문서를 읽고 쓴 것이고 어떤 시스템의 결과도 보지 않았다. 숫자 계산, 같은 쪽의 비슷한 수치, 빈칸 조항, 두 약관 비교처럼 틀리기 쉬운 유형을 넣었다. 폐기한 세트의 결과는 EVALUATION.md에서 쓰지 않는다(`results/test_*`에는 남아 있다).
+  - 새 세트는 한 번도 본 적이 없으므로 T1·T2·T3·T4 모두 `self2` 41문항에서 한 번씩 실행한다. 제공 test 90문항은 T1·T2·T3 결과가 이미 있고 T4만 새로 돌린다.
+
+| 실행 | 설정 파일 | 실험 이름 | 대상 |
+|---|---|---|---|
+| T4 작은 모델 | `configs/013b-rerank-lite.yaml` (T2와 같은 구조, 답변·rerank 모델만 `gemini-3.5-flash-lite`, 프롬프트 `answer_v4`) | `test_013b_rerank_lite` | 제공 test 90 + self2 41 |
+| T1 (self2만) | `configs/baseline.yaml` | `test_000_baseline_self2` | self2 41 |
+| T2 (self2만) | `configs/013-rerank-flash36.yaml` | `test_013_rerank_flash36_self2` | self2 41 |
+| T3 (self2만) | `configs/008b-agent-950.yaml` | `test_008b_agent950_self2` | self2 41 |
+
+- 최종 시스템: **T4** (사용자 결정 2026-10-22, 가격). T2는 같은 구조의 큰 모델 판이다.
 - 실행 일시, 결과 요약과 EVALUATION.md 링크: _..._
 
 ### 10. 사고와 교훈

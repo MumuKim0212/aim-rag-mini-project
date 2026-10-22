@@ -56,14 +56,15 @@ Files (read by `src/rag/golden.py`; both are frozen once a run has used them —
 | File | Contents | Split |
 |---|---|---|
 | `provided.jsonl` | 180 provided questions converted to the format below | dev 90 / test 90, stratified by set × difficulty (× category for negatives); seed recorded in `review_log.md` |
-| `self.jsonl` | Self-written set (submission/PLAN.md §2.3), draft of 20 questions written 2026-10-22 (15 answerable, 5 not; `evidence_reviewed: false` until a human checks it; see `review_log.md`) | all `test`, evaluated only at workflow step 8 |
+| `self2.jsonl` | Self-written set (submission/PLAN.md §2.3), 41 questions written 2026-10-22 (32 answerable, 9 abstain / clarify / refuse), set `self2`, all `test`, evaluated only at workflow step 8. Evidence quotes are cut from the page text and auto-matched; answers were checked against the source pages. Built from the documents only, without looking at any system result | all `test` |
+| `self.jsonl` | Archived first draft (20 questions, set `self`). Replaced by `self2.jsonl` because the final system scored 1.0 on it. Kept frozen so results that used it still resolve; not used in the final comparison | all `test` |
 | `review_log.md` | Every fix to a question, reference answer, or page, with the reason; split seed | – |
 
 Fields used in this project, on top of the general format above:
 
 | Field | Values |
 |---|---|
-| `qid` | provided `case_id` (`POS001`, `NEG001`, `ADD-HP01`), self-written `SELF001`… |
+| `qid` | provided `case_id` (`POS001`, `NEG001`, `ADD-HP01`), self-written `SELFB001`… (archived draft: `SELF001`…) |
 | `set` | `base_positive`, `base_negative`, `life_guide`, `additional`, `self` — decides the index scope (`configs/baseline.yaml` `corpus.set_scope`) |
 | `expected_behavior` | provided value; self-written questions use the same vocabulary. Allowed system statuses per value: `BEHAVIORS` in `src/rag/golden.py` (review it during conversion; `tests/test_golden.py` checks coverage) |
 | `must_include`, `must_not_include`, `difficulty`, `category` | copied from the provided answers; given to the judge |
@@ -73,7 +74,7 @@ Fields used in this project, on top of the general format above:
 
 Extra fields written by `scripts/convert_golden.py`: `evidence_pages` (`{file, page, source}` per quote, source
 `text` = PDF text layer, `vlm` = VLM supplement in corpus/pages.jsonl), `evidence_source`, `source_kind`
-(glossary / terms / page), `context_type` (text / paragraph / table / chart), `evidence_reviewed`, `note`,
+(glossary / terms / page), `context_type` (text / paragraph / table / chart), `note`,
 plus `source_file` / `source_locator` for the additional set. `golden/evidence.jsonl` holds the hand-reviewed
 quotes (and `extra_targets`) the converter reads; edit that file, not provided.jsonl.
 
