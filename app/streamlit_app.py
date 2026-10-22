@@ -2,9 +2,13 @@
 
     streamlit run app/streamlit_app.py
 
-Pages: overview, flow, score history, chunking, a live question run step by step, final test, per-question
-results, glossary. The live page calls the Gemini API (needs .env) and uses the indexes in out/index
-(scripts/build_index.py). It runs dev questions or free text, never the test split.
+Pages: overview, agent select, flow, score history, chunking, a live question run step by step, final test,
+per-question results, log, glossary. The live page calls the Gemini API (needs .env) and uses the indexes in
+out/index (scripts/build_index.py). It runs dev questions or free text, never the test split.
+
+Agent select / log (scripts/branch_agents.py): every app start looks up the agents committed on all origin
+branches; a picked agent runs on dev questions with its own branch's code (a detached checkout under
+out/agent_runs/), and the log page compares two or more such runs.
 """
 
 import json
@@ -475,6 +479,194 @@ def page_results():
 
 
 # ---------------------------------------------------------------- 7. glossary
+# ---------------------------------------------------------------- agent select / log (branch agents)
+sys.path.insert(0, str(ROOT / "scripts"))
+import branch_agents as BA  # noqa: E402
+
+EST_USD = {"gemini-3.6-flash": 0.011, "gemini-3.8-flash": 0.011, "gemini-3.5-flash-lite": 0.004,
+           "gemini-3.1-flash-lite": 0.004}  # agent USD per question on dev (results of cards 008/014), + judge ~0.0015
+
+
+def refresh_agents(force: bool = False):
+    """Look up the agents committed on every origin branch: once per browser session (each app start or new
+    tab) and on demand. Falls back to the last fetched refs when GitHub cannot be reached."""
+    if force or "branch_agents" not in st.session_state:
+        with st.sidebar, st.spinner("GitHub 브랜치의 agent 조회 중…"):
+            try:
+                st.session_state.branch_agents = BA.scan(fetch=True)
+                st.session_state.branch_agents_note = ""
+            except Exception as e:
+                st.session_state.branch_agents = BA.scan(fetch=False)
+                st.session_state.branch_agents_note = f"GitHub에 연결하지 못해 마지막으로 받아 둔 브랜치 정보로 보여 줍니다 ({type(e).__name__})."
+            st.session_state.branch_agents_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+    return st.session_state.branch_agents
+
+
+def page_agent_select():
+    st.title("🤖 에이전트 선택")
+    hero("팀원 agent를 같은 문항으로 돌려 비교합니다",
+         "GitHub 저장소의 모든 브랜치에서 커밋된 agent를 찾아 목록으로 보여 줍니다. 고른 agent로 dev 문항의 답(QA 데이터)을 만들고 "
+         "채점해서 📋 log 페이지에 쌓습니다.")
+    c1, c2 = st.columns([4, 1])
+    if c2.button("🔄 목록 새로고침", width="stretch"):
+        refresh_agents(force=True)
+    agents = refresh_agents()
+    c1.caption(f"마지막 조회: {st.session_state.get('branch_agents_at')} · 브랜치 "
+               f"{len({a['branch'] for a in agents})}개에서 agent {len(agents)}개")
+    if st.session_state.get("branch_agents_note"):
+        st.warning(st.session_state.branch_agents_note)
+
+    table = pd.DataFrame([{
+        "agent": a["label"], "브랜치": a["branch"], "커밋": a["commit"], "커밋 시각": a["date"], "작성자": a["author"],
+        "설정": a["config"], "종류": a["system"], "답변 모델": a["answer_model"],
+        "청킹": f"{a['chunking'].get('method')} {a['chunking'].get('chunk_size')}/{a['chunking'].get('chunk_overlap')}",
+        "같은 코드 묶음": a["same_code_id"], "설명": a["description"],
+    } for a in agents])
+    groups = table.groupby("같은 코드 묶음")["agent"].transform("count")
+    table["같은 코드 묶음"] = [f"{g} ({n}개 같음)" if n > 1 else g for g, n in zip(table["같은 코드 묶음"], groups)]
+    st.dataframe(table, width="stretch", hide_index=True, height=320)
+    st.caption("'같은 코드 묶음'이 같은 agent는 코드와 설정이 완전히 같습니다(다른 브랜치에 같은 커밋이 들어간 경우). "
+               "비교할 때는 묶음마다 하나씩만 고르면 됩니다.")
+
+    st.subheader("QA 데이터 만들기")
+    picked = st.multiselect("실행할 agent (여러 개 고르면 같은 문항으로 각각 실행)", [a["label"] for a in agents])
+    c1, c2 = st.columns(2)
+    limit = c1.select_slider("dev 문항 수 (앞에서부터, 모든 agent가 같은 문항)", [5, 10, 20, 30, 45, 90], value=10)
+    sets = c2.multiselect("세트만 고르기 (비우면 전체)", ["base_positive", "base_negative", "life_guide", "additional"])
+    chosen = [a for a in agents if a["label"] in picked]
+    est = sum((EST_USD.get(a["answer_model"], 0.011) + 0.0015) * limit for a in chosen)
+    st.markdown(f'<div class="note">예상 비용 약 <b>{est:.2f} USD</b> (agent {len(chosen)}개 × {limit}문항, 채점 포함) · '
+                f'agent 하나에 {limit}문항이면 약 {max(1, limit // 8)}~{max(2, limit // 4)}분. test 문항은 쓰지 않습니다. '
+                "검색 인덱스가 이 PC에 없는 설정이면 처음 한 번 인덱스를 만듭니다(약 0.15 USD).</div>",
+                unsafe_allow_html=True)
+    if st.button("▶ 선택한 agent로 QA 실행", type="primary", disabled=not chosen):
+        for a in chosen:
+            exp = BA.start(a, limit, ",".join(sets) or None)
+            st.toast(f"시작: {a['label']} → {exp}")
+
+    @st.fragment(run_every="5s")
+    def job_status():
+        jobs = BA.jobs()
+        if not jobs:
+            st.caption("아직 실행한 작업이 없습니다.")
+            return
+        st.subheader("실행 상태")
+        steps = {"queued": "대기", "checkout": "브랜치 코드 준비", "index": "인덱스 확인", "run": "답변 생성",
+                 "grade": "채점", "evaluate": "지표 계산", "done": "완료"}
+        st.dataframe(pd.DataFrame([{
+            "실험": j["experiment"], "agent": (j.get("entry") or {}).get("label"),
+            "상태": {"running": "⏳ 실행 중", "queued": "⏳ 대기", "done": "✅ 완료", "failed": "❌ 실패"}.get(j.get("status"), j.get("status")),
+            "단계": steps.get(j.get("step"), j.get("step")),
+            "진행": f"{j.get('done_questions', '')}/{j.get('limit') or 90}" if j.get("status") == "running" else "",
+            "시작": j.get("started"), "오류": j.get("error", ""),
+        } for j in jobs[:20]]), width="stretch", hide_index=True)
+        st.caption("5초마다 자동으로 갱신됩니다. 실행 로그: out/agent_runs/jobs/<실험>.log · 완료된 결과는 📋 log 페이지에서 비교합니다.")
+
+    job_status()
+
+
+def page_log():
+    st.title("📋 log: agent 실행 비교")
+    hero("두 개 이상의 agent 실행을 한 표로 비교합니다",
+         "🤖 에이전트 선택에서 실행한 결과와, 저장소에 이미 있는 dev agent 결과를 함께 놓고 점수·비용·속도·세트별 점수·문항별 점수를 비교합니다.")
+    runs = [r for r in BA.read_log() if r["status"] == "done"]
+    failed = [r for r in BA.read_log() if r["status"] != "done"]
+    rows = []
+    for r in runs:
+        rows.append({**r, "출처": "실행 로그", "path": str(BA.RESULTS / r["experiment"])})
+    if st.toggle("저장소에 있는 dev agent 결과도 포함 (results/)", value=True):
+        for p in sorted(RESULTS.glob("dev_*/summary.json")):
+            s = json.loads(p.read_text(encoding="utf-8"))
+            if str(s.get("system", "")).startswith("agent") and (p.parent / "grades.jsonl").exists():
+                rows.append({"experiment": p.parent.name, "agent": f"(저장된 결과) {p.parent.name}", "branch": "현재 checkout",
+                             "commit": "", "config": s.get("config_file", ""), "started": s.get("created_at"), "minutes": None,
+                             **BA._scores(s), "출처": "results/", "path": str(p.parent)})
+    if not rows:
+        st.info("아직 비교할 실행이 없습니다. 🤖 에이전트 선택 페이지에서 agent를 실행하세요.")
+        return
+    df = pd.DataFrame(rows)
+    df["표시"] = df["agent"] + " · " + df["experiment"].str[-8:]
+
+    st.subheader("전체 실행 기록")
+    cols = {"표시": "실행", "branch": "브랜치", "commit": "커밋", "config": "설정", "n": "문항", "correctness": "정답 점수",
+            "fully_correct": "완전 정답률", "status_ok": "대응 일치율", "citation_on_target": "출처 일치율",
+            "usd_per_question": "USD/문항", "llm_per_question": "LLM 호출/문항", "p50": "p50 초", "p90": "p90 초",
+            "minutes": "걸린 분", "judge": "채점", "started": "시작", "출처": "출처"}
+    view = df[list(cols)].rename(columns=cols)
+    st.dataframe(view.style.format({"정답 점수": "{:.3f}", "완전 정답률": "{:.3f}", "대응 일치율": "{:.3f}", "출처 일치율": "{:.3f}",
+                                    "USD/문항": "{:.4f}", "LLM 호출/문항": "{:.2f}", "p50 초": "{:.1f}", "p90 초": "{:.1f}"},
+                                   na_rep="–"), width="stretch", hide_index=True)
+    if failed:
+        with st.expander(f"실패한 실행 {len(failed)}개"):
+            st.dataframe(pd.DataFrame(failed)[["started", "agent", "failed_step", "experiment"]], hide_index=True)
+
+    st.subheader("한눈에 비교")
+    logged = df[df["출처"] == "실행 로그"]["표시"].tolist()
+    default = logged[-4:] if len(logged) >= 2 else df["표시"].tolist()[:2]  # the latest runs made on the select page
+    picked = st.multiselect("비교할 실행 (2개 이상)", df["표시"].tolist(), default=default)
+    if len(picked) < 2:
+        st.info("두 개 이상 고르면 비교표가 나옵니다.")
+        return
+    sel = df.set_index("표시").loc[picked]
+    grades = {k: {g["qid"]: g["correctness"] for g in jsonl(str(Path(sel.loc[k, "path"]) / "grades.jsonl"))} for k in picked}
+    common = sorted(set.intersection(*(set(g) for g in grades.values())))
+    if not common:
+        st.warning("고른 실행들이 함께 푼 문항이 없습니다. 같은 문항 수로 실행한 것끼리 고르세요.")
+        return
+    st.caption(f"고른 실행들이 함께 푼 문항 {len(common)}개로 다시 계산했습니다(문항 수가 다르면 공통 문항만 비교).")
+
+    metrics = {}
+    for k in picked:
+        m = {x["qid"]: x for x in jsonl(str(Path(sel.loc[k, "path"]) / "metrics.jsonl")) if x["qid"] in common}
+        g = grades[k]
+        lat = sorted(m[q]["latency_s"] for q in common)
+        metrics[k] = {"정답 점수": sum(g[q] for q in common) / len(common) / 2,
+                      "완전 정답률": sum(g[q] == 2 for q in common) / len(common),
+                      "대응 일치율": sum(m[q].get("status_ok") or 0 for q in common) / len(common),
+                      "출처 일치율": pd.Series([m[q].get("citation_on_target") for q in common]).mean(),
+                      "USD/문항": sum(m[q]["usd"] for q in common) / len(common),
+                      "LLM 호출/문항": sum(m[q]["n_llm_calls"] or 0 for q in common) / len(common),
+                      "검색/문항": sum(m[q].get("n_searches") or 0 for q in common) / len(common),
+                      "p90 초": lat[int(0.9 * (len(lat) - 1))]}
+    cmp_ = pd.DataFrame(metrics)
+    best = {"정답 점수": max, "완전 정답률": max, "대응 일치율": max, "출처 일치율": max, "USD/문항": min, "LLM 호출/문항": min,
+            "검색/문항": min, "p90 초": min}
+
+    def mark(row):
+        b = best[row.name](row)
+        return ["background-color:#dcfce7; color:#14532d; font-weight:700" if v == b else "" for v in row]
+    st.dataframe(cmp_.style.apply(mark, axis=1).format("{:.3f}"), width="stretch")
+    st.caption("초록색 = 그 지표에서 가장 좋은 실행 (점수는 높을수록, 비용·호출·시간은 낮을수록).")
+
+    from evalkit.paired import compare
+    base = picked[0]
+    pair = []
+    for k in picked[1:]:
+        r = compare({q: grades[base][q] for q in common}, {q: grades[k][q] for q in common}, max_score=2.0)
+        pair.append({"비교": f"{k}  vs  {base}", "점수 차이": r["diff"], "우세 / 열세 / 같음":
+                     f"{len(r['b_better'])} / {len(r['a_better'])} / {r['same']}", "순증": len(r["b_better"]) - len(r["a_better"]),
+                     "95% 신뢰구간": f"[{r['ci95'][0]:+.3f}, {r['ci95'][1]:+.3f}]",
+                     "판정": "차이 있음" if (r["ci95"][0] > 0 or r["ci95"][1] < 0) else "구별 안 됨"})
+    st.markdown(f"**짝비교 (기준: 처음 고른 실행 `{base}`)**")
+    st.dataframe(pd.DataFrame(pair).style.format({"점수 차이": "{:+.3f}"}), width="stretch", hide_index=True)
+    st.caption("팀 규칙: 바뀐 문항이 잡음(90문항 중 14개)보다 많고 신뢰구간이 0을 포함하지 않아야 차이가 있다고 봅니다. "
+               "문항 수가 적으면 신뢰구간이 넓어 '구별 안 됨'이 나오기 쉽습니다.")
+
+    by_set = pd.DataFrame({k: sel.loc[k, "by_set"] or {} for k in picked})
+    if len(by_set):
+        st.markdown("**세트별 정답 점수** (각 실행 전체 문항 기준)")
+        st.dataframe(by_set.style.format("{:.3f}", na_rep="–"), width="stretch")
+
+    st.markdown("**문항별 점수** (0~2, 실행마다 다른 문항만 보려면 체크)")
+    only_diff = st.checkbox("점수가 갈린 문항만", value=True)
+    golden = {i["qid"]: i for i in load_golden()}
+    grid = pd.DataFrame({k: {q: grades[k][q] for q in common} for k in picked})
+    if only_diff:
+        grid = grid[grid.nunique(axis=1) > 1]
+    grid.insert(0, "질문", [golden.get(q, {}).get("question", "")[:50] for q in grid.index])
+    st.dataframe(grid.style.background_gradient(cmap="RdYlGn", vmin=0, vmax=2, subset=picked), width="stretch")
+
+
 def page_glossary():
     st.title("📖 용어 설명")
     terms = {
@@ -496,8 +688,9 @@ def page_glossary():
             st.write(v)
 
 
-PAGES = {"🏠 처음 보는 분을 위한 요약": page_overview, "🧭 전체 흐름": page_flow, "📈 점수가 오른 과정": page_history,
-         "✂️ 글을 자른 방식": page_chunks, "🔎 질문 따라가기 (실시간)": page_live, "🏁 최종 시험 결과": page_test,
-         "🧾 문항별 결과": page_results, "📖 용어 설명": page_glossary}
+PAGES = {"🏠 처음 보는 분을 위한 요약": page_overview, "🤖 에이전트 선택": page_agent_select, "🧭 전체 흐름": page_flow,
+         "📈 점수가 오른 과정": page_history, "✂️ 글을 자른 방식": page_chunks, "🔎 질문 따라가기 (실시간)": page_live,
+         "🏁 최종 시험 결과": page_test, "🧾 문항별 결과": page_results, "📋 log": page_log, "📖 용어 설명": page_glossary}
 st.sidebar.title("📚 금융 문서 QA")
+refresh_agents()  # every app start / new browser session looks up the agents committed on the branches
 PAGES[st.sidebar.radio("메뉴", list(PAGES), label_visibility="collapsed")]()
