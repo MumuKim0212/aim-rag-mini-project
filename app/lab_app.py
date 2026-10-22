@@ -45,6 +45,9 @@ nav = st.navigation({
     "6. 문항별 결과": [
         st.Page(P + "question_view.py", title="문항 하나씩 보기", icon="🔎"),
     ],
+    "7. Report": [
+        st.Page(P + "report.py", title="실습 리포트 (웹·PDF)", icon="📑"),
+    ],
 })
 
 import importlib  # noqa: E402
