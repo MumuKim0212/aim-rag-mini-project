@@ -96,7 +96,7 @@ def scan(fetch: bool = True) -> list[dict]:
     cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
     found, blobs = [], None
     for branch, sha in branches(fetch):
-        if sha not in cache or any("added" not in e for e in cache[sha]["agents"]):
+        if sha not in cache or any("first_added" not in e for e in cache[sha]["agents"]):
             blobs = blobs or Blobs()
             files = [f.split("/")[-1] for f in git("ls-tree", "--name-only", sha, "configs/").split()
                      if f.endswith(".yaml")]
@@ -113,7 +113,14 @@ def scan(fetch: bool = True) -> list[dict]:
                     continue
                 ident = hashlib.sha1(json.dumps([code, cfg], sort_keys=True, default=str).encode()).hexdigest()[:8]
                 added = int(git("log", "-1", "--format=%ct", sha, "--", f"configs/{f}").strip() or 0)
+                # when the config first appeared on this branch, and what the agent is (config + its implementation
+                # file), so a copy of another teammate's agent can be told from the branch's own (latest_per_branch)
+                first = git("log", "--diff-filter=A", "--format=%ct", sha, "--", f"configs/{f}").split()
+                impl = "src/rag/agent_repair.py" if system == "agent_repair" else "src/rag/agent.py"
+                origin = hashlib.sha1(json.dumps([git("rev-parse", f"{sha}:{impl}").strip(), cfg], sort_keys=True,
+                                                 default=str).encode()).hexdigest()[:8]
                 entries.append({"config": f, "name": cfg.get("name"), "system": system, "added": added,
+                                "first_added": int(first[-1]) if first else added, "origin_key": origin,
                                 "description": cfg.get("description", ""), "answer_model": cfg.get("answer", {}).get("model"),
                                 "chunking": cfg.get("chunking", {}), "card": cfg.get("card"), "same_code_id": ident,
                                 "judge": cfg.get("judge", {})})
@@ -133,11 +140,21 @@ def label(branch: str, config: str, agents: list[dict]) -> str:
     return f"{branch} agent" + (f" ({config.removesuffix('.yaml')})" if len(agents) > 1 else "")
 
 
-def latest_per_branch(agents: list[dict]) -> list[dict]:
-    """One agent per branch: the one whose config was committed last on that branch (ties: higher config
-    number), labelled '<branch> agent'."""
-    best: dict[str, dict] = {}
+def originals(agents: list[dict]) -> list[dict]:
+    """Drop copies: the same agent (same config and implementation file) that first appeared on another branch
+    earlier. A teammate who copies someone's agent files into their branch to compare does not make it theirs;
+    agents shared through merged history (added in the same commit) count on every branch."""
+    first = {}
     for a in agents:
+        first[a["origin_key"]] = min(first.get(a["origin_key"], a["first_added"]), a["first_added"])
+    return [a for a in agents if a["first_added"] <= first[a["origin_key"]]]
+
+
+def latest_per_branch(agents: list[dict]) -> list[dict]:
+    """One agent per branch: among the branch's own agents (copies dropped, see originals), the one whose
+    config was committed last on that branch (ties: higher config number), labelled '<branch> agent'."""
+    best: dict[str, dict] = {}
+    for a in originals(agents):
         b = best.get(a["branch"])
         if b is None or (a["added"], a["config"]) > (b["added"], b["config"]):
             best[a["branch"]] = a
